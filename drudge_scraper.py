@@ -1,35 +1,14 @@
 from bs4 import BeautifulSoup
-from urllib2 import urlopen
-from time import gmtime
-from datetime import date
-from sys import argv
-import re
+
 import csv
+from datetime import date
+import re
 import socket
+from sys import argv
+from time import gmtime
+from urllib2 import urlopen
 
-''' This is a script to scrape www.drudgereportarchives.com for the headlines and urls of everything matt drudge has linked to since September SOMETHING 2001
-
-    
-    contents/glossary:
-        
-        DayPage: an object that contains a url for a day page, along with the date. also keeps track of the day order
-    
-        archive: the totality of the drudge report archives.
-    
-        day page: the website that contains links to the drudge pages
-      
-        day_page_scraper(): a method of a day page object that scrapes the html for the urls to the drudge pages
-            
-        drudge page: an object containing each individual instance of the drudge report
-        
-        drudge link: an object containing individual url on a drudge page
-    
-        day_page_url_generator(): takes a day, a month, and a year, and assembles a url for a day page
-        
-        day_page_list_generator(): creates a list containing urls for day pages from the first day of the archive until the current day
-
-
-'''
+TEMP_DAYS_FILENAME = 'day.csv'
 
 class DayPage(object):
 
@@ -79,10 +58,9 @@ class DrudgePage(object):
     
     def __init__(self, day_page_obj, url, time): 
         self.url = url
-        self.drudge_date = day_page_obj.drudge_date
-        self.day_order = day_page_obj.day_order
         self.time = time
         self.drudge_links = []
+        self.link_count = None
         
     def try_request(self, url):
         success = False
@@ -155,7 +133,9 @@ class DrudgePage(object):
             else:
                 drudge_link_obj = DrudgeLink(linkid, link['href'], 
                                              link.text.encode('utf-8').lower(), 
-                                             self, main, splash) 
+                                             self, 
+                                             main, 
+                                             splash) 
             return_list.append(drudge_link_obj)
         self.drudge_links = return_list
         return return_list
@@ -166,10 +146,7 @@ class DrudgeLink(object):
         self.hed = hed
         self.main = main
         self.splash = splash
-        self.source = ""
-        self.drudge_date = drudge_page_object.drudge_date
-        self.day_order = drudge_page_object.day_order
-        self.time = drudge_page_object.time
+        self.source = None
         self.linkid = linkid
         
     def extract_source(self):
@@ -180,7 +157,6 @@ class DrudgeLink(object):
         else:
             self.source = domain_componenets[1]
         
-                
     def list_dump(self):
         #print self.linkid
         return [self.linkid,
@@ -207,6 +183,14 @@ def day_page_url_generator(year, month, day):
     url_components = [base_url, date_portion, url_end]
     day_page_url = "".join(url_components)
     return day_page_url
+
+def dump_day_pages_to_file(list_of_day_pages, filename):
+    with open(filename, 'w') as f:
+        writer = csv.writer(f)      
+        for day in list_of_day_pages:
+            writer.writerow([day.day_order,
+                             day.drudge_date,
+                             day.url])
 
 def day_page_list_generator(start = {}, end = {}):
     '''Returns a list of urls to for each day page in the drudge Archive 
@@ -332,34 +316,23 @@ def main_splash_tester():
     print main
 '''
 
+def scraper():
+    ''' This should get all the info we want for days, pages, and links.
+        This version should output days, one page, and that page worth
+        of links to .csv files. '''
+    day_pages = day_page_list_generator()
+    dump_day_pages_to_file(day_pages, 'days.csv')
+    test
+
 if __name__ == "__main__":
-    iterate_dump()
+    scraper()
 
 
-'''
+    '''
     #set a start and end date
     start_date = {'year': 2014, 'month':2, 'day':21}
     end_date = {'year': 2014, 'month':2, 'day': 21}
     #iterate_dump()
     one_drudge_page_dump()
-'''
-                
- 
-'''
-        drop:
-        
-            link_id             Primary key, generated while scraping
-            url                 DrudgeLink.url 
-            hed                 DrudgeLink.text
-            heading             DrudgeLink.heading (t/f)
-            splash              DrudgeLink.splash (t/f)
-            year                DrudgeLink.date['year']
-            month               DrudgeLink.date['month']
-            day                 DrudgeLink.date['day']
-            time                DrudgeLink.time
-            day_order           DrudgeLink.day_order
-
-             
-        into MySQL database.
-        
-'''
+    '''
+         
