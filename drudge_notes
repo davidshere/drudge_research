@@ -1,0 +1,10 @@
+I'm on the cusp of having my scraper written, and I'm not entirely sure I know where to go from here. I should also write it so that it doesn't store pages I don't care about
+
+0. Figure out how to keep track of the order of the pages. was this drudge page on the 2840th unique drudge page? Was it the 204th day?
+
+0.1 Have a class Url that stores, well, individual urls. Then have a subclass DayPageUrls that also records the date AND TIME and keeps track of the order. Have another subclass DrudgePageUrls that keeps track of the order in terms of drudge pages. AND NOTES WHETHER OR NOT IT WAS THE BIG HEADLINE OR IN THE HEADING
+
+1. Download the data into a MySQL database. Just download it and put it in there. The worst case scenario is that if you mess up you can always rescrape the archive. 
+
+
+
