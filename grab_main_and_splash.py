@@ -1,11 +1,17 @@
 from bs4 import BeautifulSoup
+import requests
 from urllib2 import urlopen
+import drudge_scraper as scraper
 
-'''
-url = 'http://www.drudgereportarchives.com/data/2014/02/03/20140203_000653.htm'
-
-html = urlopen(url).read()
-'''
+def get_ten_drudge_pages():
+    ## pull a list of ten day pages
+    all_day_pages = scraper.day_page_list_generator()
+    indices = xrange(0, len(all_day_pages), len(all_day_pages)/10)
+    day_pages = [all_day_pages[num].url for num in indices]
+    day_page_htmls = [requests.get(day).text for day in day_pages]
+    print day_page_htmls
+    ## next pull a single drudge page from each page, write
+    ## each one to a file for further analysis. 
 
 filename = 'sample_drudge_page.htm'
 with open(filename, 'r') as f:
@@ -19,11 +25,10 @@ def top_hed_finder(soup):
     top = [link.text.encode('utf-8') for link in top]
     splash = ""
     splash = top.pop()
-    main = set(top)
-    return (main, splash)
+    return (top, splash)
 
 topheds, mainhed = top_hed_finder(soup)
 
-print topheds
-print
-print mainhed
+#print "%s\n\n%s" % (topheds, mainhed)
+
+get_ten_drudge_pages()
