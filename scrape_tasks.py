@@ -9,20 +9,19 @@ def extract_source(url):
     have to check the results for things that shouldn't be there, like 'www' 
     '''
     
-    try:
-        hostname = re.search(r'[a-zA-Z0-9.]+', url).group()
-        hostname_components = hostname.split(".")
-        if len(hostname_components) == 3:
-            domain = hostname_components[1]
-        elif len(hostname_components) == 4:
-            if len(hostname_components[3]) > 2:
-                domain = hostname_components[2]
-            else:
-                domain = hostname_components[1]
+    hostname = re.search(r'[a-zA-Z0-9.]+', url).group()
+    hostname_components = hostname.split(".")
+    if len(hostname_components) == 3:
+        domain = hostname_components[1]
+    elif len(hostname_components) == 4:
+        if len(hostname_components[3]) > 2:
+            domain = hostname_components[2]
         else:
-            domain = hostname_components[0]
-    except:
-        return None
+            domain = hostname_components[1]
+    else:
+        domain = hostname_components[0]
+    return domain
+
         
 def auto_name_gen():
     '''

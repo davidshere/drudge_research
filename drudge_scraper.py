@@ -48,8 +48,7 @@ class DayPage(DrudgeBase):
                             'time':url.text.encode('utf-8').strip(), 
                             'drudge_date':self.drudge_date,
                             'day_order':self.day_order} 
-                            for url in all_urls if 
-                                url['href'][0:41] == url_front]
+                            for url in all_urls if url['href'][0:41] == url_front]
                                 
         drudge_url_list = [entry for entry in drudge_url_list if entry['time']!="^"]
         return [DrudgePage(self, 
@@ -69,9 +68,7 @@ class DrudgePage(DrudgeBase):
         self.id = id(self)  
 
 
-        
-    @classmethod 
-    def _hed_and_splash_finder():
+    def _hed_and_splash_finder(self):
       # if time/date > Oct 6, 2009 05:57:42 EXT (10:57:42 GMT)
       try:
         top = self.soup.find('div', {'id': 'drudgeTopHeadlines'})
@@ -222,16 +219,16 @@ def scrape_archive():
 
     '''
     # generate a list of day_pages within start and end dates, if given
-    start_date = {'year': 2014, 'month':12, 'day': 3}
+    start_date = {'year': 2014, 'month':12, 'day': 7}
     end_date = {'year':2014, 'month':12, 'day': 7}
     day_pages = day_page_list_generator(start=start_date, end=end_date) 
     link_header_row = ['url',  'hed', 'main', 'splash',  'parent_drudge_page_id']
     day_page_header_row = []
-    drudge_page_header_row []    
+    drudge_page_header_row = []    
     #open a connection a .csv file to dump the data
     with open('drudge_page.csv', 'w') as page:
         writer = csv.writer(page)   
-        writer.writerow(header_row)
+        writer.writerow(link_header_row)
 
         for day in day_pages:
             #scrape each day page
@@ -249,23 +246,15 @@ def scrape_archive():
 
 '''
 For development, not for keeping
-'''
+
 day = day_page_list_generator()[0]
 page = day.scrape_day_page()[0]
 link = page.drudge_page_scraper()[0]
 scrape_archive()
 
+'''
+
 
 
 if __name__ == "__main__":
-    #iterate_dump()
-
-
-    '''
-    #set a start and end date
-    start_date = {'year': 2014, 'month':2, 'day':21}
-    end_date = {'year': 2014, 'month':2, 'day': 21}
-    #iterate_dump()
-    one_drudge_page_dump()
-    '''
-         
+    scrape_archive()
