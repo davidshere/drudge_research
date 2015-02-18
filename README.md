@@ -1,4 +1,6 @@
-drudge_research
+The Drudge Report Research Project
 ===============
 
-A collection of code for a scraper, database, data analysis, and eventually a web app.
+This is a project to help researchers and the curious learn about The Drudge Report, an influential media website. 
+
+It's a work in progress
