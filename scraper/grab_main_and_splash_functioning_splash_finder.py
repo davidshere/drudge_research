@@ -9,7 +9,7 @@
 from bs4 import BeautifulSoup
 import urlparse
 
-#from parser_utils import recent_top_splash_finder
+from parser_utils import recent_top_splash_finder
 from parser_utils import ParseError
 
 STOP_DOMAINS = [
@@ -60,31 +60,30 @@ def single_page_tester(page_number):
   main = top_splash_finder(soup)
   return '=====\ntop:\n%s\n\nsplash:\n%s' % (main['top'], main['splash'])
 
-def find_splash_with_center_tag(soup):
-  centers = soup.find_all('center')
-  print centers[2]
-
 def find_splash_with_font_size(soup):
-  return soup.find('font', {"size":"+7"}).find('a')
+  font_size_element = soup.find('font', {"size":"+7"})
+  link = font_size_element.find('a')
+  if link:
+    return link
+  return font_size_element.next.find('a')
 
 
-
-# starting in mid 2007 to mid 2009
-def get_2007_to_2009(soup):
+# starting in mid 2004 to mid 2009
+def get_2004_to_2009(soup):
   splash = find_splash_with_font_size(soup)
   links = soup.find_all('a')
   top = get_top(links, splash)
   return {'top': top, 'splash': splash}
 
 def get_top(links, found_splash):
+  print found_splash
   top_links = []
   try:
     splash_index = links.index(found_splash)
   except ValueError:
-    for link in links:
+    for link in links[8:]:
       if link.decode() == STOP_LINK:
         splash_index = links.index(link)
-
   for j in range(splash_index-1, 0, -1):
     parsed_url = urlparse.urlparse(links[j].get('href')).netloc.lower()
     if parsed_url in STOP_DOMAINS:
@@ -99,15 +98,13 @@ if __name__ == '__main__':
 
   # alternative strategy could be to find the first link, work back
   # from there
-  for i in range(16, 0, -1):
+  for i in range(24, 0, -1):
     print i,
     soup = load_html(i)
     try:
       print recent_top_splash_finder(soup)
     except ParseError:
-      print get_2007_to_2009(soup)
-    except ValueError:
-      stop_link
+      print get_2004_to_2009(soup)
 
 
 
