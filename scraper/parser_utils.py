@@ -19,9 +19,8 @@ def recent_top_splash_finder(soup):
 	# This works for all known iterations of the drudge report in the last six years
 	top = soup.find('div', {'id': 'drudgeTopHeadlines'})
 	if not top:
-		raise ParseError(msg="id: 'drudgeTopHeadlines' not found")
+		raise ParseError("id: 'drudgeTopHeadlines' not found")
 	top = top.find_all('a')
-	top = [link.text.encode('utf-8') for link in top]
 	splash = top.pop()
 	return {'top': top, 'splash': splash}
 
