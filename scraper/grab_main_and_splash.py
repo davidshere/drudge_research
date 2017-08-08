@@ -1,100 +1,31 @@
-#!/usr/bin/env python
+#!/usr/local/bin/env python
 # -*- coding: latin-1 -*-
 
+''' We have to use funny encoding here because there are some non-ascii 
+    characters on the Drudge Report, and some of them we have to specify
+    here
+'''
+
 from bs4 import BeautifulSoup
-import requests
-import re
-import drudge_scraper as scraper
+import urlparse
 
-CURRENT_FILENAME = 'splash_research/current_drudge.html'
-with open(CURRENT_FILENAME, 'r') as f:
-  html = f.read()
-  csoup = BeautifulSoup(html, 'lxml')
+from parser_utils import recent_top_splash_finder
+from parser_utils import ParseError
 
-SAMPLE_FILENAME = 'splash_research/sample_drudge_page.htm'
-with open(SAMPLE_FILENAME, 'r') as f:
-  html = f.read()
-  ssoup = BeautifulSoup(html, 'lxml')
+STOP_DOMAINS = [
+  'harvest.adgardener.com',
+  'a.tribalfusion.com'
+]
 
-OLDER_FILENAME = 'splash_research/older_drudge_page.html'
-with open(OLDER_FILENAME, 'r') as f:
-  html = f.read()
-  osoup = BeautifulSoup(html, 'lxml')
+STOP_LINK = u'<a href="http://www.drudgereport.com/"><img border="0" height="85" src="http://www.drudgereport.com/logo9.gif" width="610"/></a>'
 
+def top_splash_finder(soup):
+  first_try = recent_top_splash_finder(soup)
+  if first_try:
+    return first_try
+  else:
 
-class MainAndSplashFinder(object):
-
-  date_dict = {}
-
-  def __init__(self):
-    pass
-
-  def which_splash_finder(self):
-    '''
-    return date_dict[drudge_date]
-    '''
-    pass
-
-  def main_and_splash(self):
-    return 
-
-
-
-def new_old_hed_finder(soup):
- #finding the splash and top headlines       
-  top = soup.find('div', {'id': 'drudgeTopHeadlines'}).find_all('a')
-  top = [link.text.encode('utf-8') for link in top]
-  splash_text = top.pop()
-  main_text = list(top)
-  print "%s\n\n%s" % (main_text, splash_text)
-
-def hed_and_splash_finder(soup):
-  # if time/date > Oct 6, 2009 05:57:42 EXT (10:57:42 GMT)
-  try:
-    top = soup.find('div', {'id': 'drudgeTopHeadlines'})
-    top = top.find_all('a')
-    top = [link.text.encode('utf-8') for link in top]
-    splash = top.pop()
-    return (top, splash)
-  except:
-    return (None, None)
-
-
-
-def hed_finder_1(soup):
-  '''Applies to archives from the beginning of the archive until...
-
-    Maybe October 2002?
-  '''
-  archive_url_part = 'drudgereportarchives.com'
-  main_links_come_after = [
-    'DrudgeReportArchives.com',
-    'Today\'s DrudgeReport.com',
-    'Drudge´s Special Reports',
-    'DrudgeReport.com',
-    'Drudge\'s Special Reports',
-    'Drudge on Twitter',
-    'Recent Headlines',
-    'Pictures',
-    '',
-    '',
-    ' ',
-    'Popular Headlines',
-    'Time Line'
-  ]
-  all_links = soup.find_all('a')
-  top = list()
-  for link in all_links:
-    if top and link.text == '': # because a link w/o text comes after the splash
-      break
-
-    if link.has_attr('href') and link.text not in main_links_come_after:
-      if not re.search(archive_url_part, link.get('href')):
-        top.append(link)
-
-  if top:
-    splash = top.pop()
-  return {top, splash
+    return {'top': top, 'splash': splash}
 
 
 def get_drudge_pages():
@@ -103,7 +34,7 @@ def get_drudge_pages():
     list_of_drudge_pages = []
     all_day_pages = scraper.day_page_list_generator()
     indices = xrange(0, len(all_day_pages), 200)
-    day_pages = [all_day_pages[num] for num in indices]
+    day_pages = [all_day_pages[i] for i in indices]
     for day in day_pages:
       print day.drudge_date
       first_drudge_page = day.scrape_day_page()[0]
@@ -113,24 +44,62 @@ def get_drudge_pages():
 def drudge_page_file_writer():
     all_day_pages = scraper.day_page_list_generator()
     indices = xrange(0, len(all_day_pages), 200)
-    day_pages = [all_day_pages[num] for num in indices]
+    day_pages = [all_day_pages[i] for i in indices]
     print day_pages[0]
     print len(day_pages)
 
+## test code ##
+def load_html(page_number):
+  with open('splash_research/test_files/test_file_%d.html' % page_number, 'r') as f:
+    html = f.read()
+  return BeautifulSoup(html, 'lxml') 
+
+def single_page_tester(page_number):
+  soup = load_html(page_number)
+  main = top_splash_finder(soup)
+  return '=====\ntop:\n%s\n\nsplash:\n%s' % (main['top'], main['splash'])
+
+def find_splash_with_font_size(soup):
+  """ Takes soup and returns the <a> element representing
+      the page splash.
+  """
+  font_size_element = soup.find('font', {"size":"+7"})
+
+  # if the HTML is malformed, this will return None
+  link = font_size_element.find('a')
+  if link:
+    return link
+  return font_size_element.next.find('a')
+
+
+# starting in mid 2002 to mid 2009
+def get_2002_to_2009(soup):
+  splash = find_splash_with_font_size(soup)
+  links = soup.find_all('a')
+  top = get_top(links, splash)
+  return {'top': top, 'splash': splash}
+
+def get_top(links, found_splash):
+  top_links = []
+  try:
+    splash_index = links.index(found_splash)
+  except ValueError:
+    for link in links[8:]:
+      if link.decode() == STOP_LINK:
+        splash_index = links.index(link)
+  for j in range(splash_index-1, 0, -1):
+    parsed_url = urlparse.urlparse(links[j].get('href')).netloc.lower()
+    if parsed_url in STOP_DOMAINS:
+      return top_links
+    top_links.append(links[j])
+
 if __name__ == '__main__':
-  drudge_page_objects = get_drudge_pages() # fetching list of drudge objects
-  drudge_page_soups = []
-  for number, page in enumerate(drudge_page_objects): # creating list of soup objects
-    url = page.url
-    html = requests.get(url).text
-    with open('scraper_research/test_file_%d.html' % number, 'w') as f:
-      f.write(html.encode('utf-8'))
-    soup = BeautifulSoup(html)
-    drudge_page_soups.append(soup)
 
-
-  old_heds = map(lambda page: hed_finder_1(page), drudge_page_soups)
-  for hed in old_heds:
-    print hed[0]
-    print hed[1]
+  for i in range(24, 0, -1):
+    print i,
+    soup = load_html(i)
+    try:
+      print recent_top_splash_finder(soup)
+    except ParseError:
+      print get_2002_to_2009(soup)
 
