@@ -22,45 +22,25 @@ STOP_LINKS = (
   u'<a href="http://www.drudgereport.com"><img border="0" height="85" src="http://www.drudgereport.com/logo9.gif" width="610"/></a>'
 )
 
-def top_splash_finder(soup):
-  first_try = recent_top_splash_finder(soup)
-  if first_try:
-    return first_try
-  else:
-
-    return {'top': top, 'splash': splash}
-
-
-def get_drudge_pages():
-    ''' Fetches html for some number of day pages and returns a list of
-        drudge page objects from the first link in each day page '''
-    list_of_drudge_pages = []
-    all_day_pages = scraper.day_page_list_generator()
-    indices = xrange(0, len(all_day_pages), 200)
-    day_pages = [all_day_pages[i] for i in indices]
-    for day in day_pages:
-      print day.drudge_date
-      first_drudge_page = day.scrape_day_page()[0]
-      list_of_drudge_pages.append({day.drudge_date: first_drudge_page})
-    return list_of_drudge_pages
-
-def drudge_page_file_writer():
-    all_day_pages = scraper.day_page_list_generator()
-    indices = xrange(0, len(all_day_pages), 200)
-    day_pages = [all_day_pages[i] for i in indices]
-    print day_pages[0]
-    print len(day_pages)
-
-## test code ##
 def load_html(page_number):
   with open('splash_research/test_files/test_file_%d.html' % page_number, 'r') as f:
     html = f.read()
   return BeautifulSoup(html, 'lxml') 
 
-def single_page_tester(page_number):
-  soup = load_html(page_number)
-  main = top_splash_finder(soup)
-  return '=====\ntop:\n%s\n\nsplash:\n%s' % (main['top'], main['splash'])
+class ParseError(Exception):
+  pass
+
+# this works on pages going back to mid 2009
+def recent_top_splash_finder(soup):
+  # This works for all known iterations of the drudge report in the last six years
+  top = soup.find('div', {'id': 'drudgeTopHeadlines'})
+  if not top:
+    raise ParseError("id: 'drudgeTopHeadlines' not found")
+  top = top.find_all('a')
+  splash = top.pop()
+  return {'top': top, 'splash': splash}
+
+
 
 def find_splash_with_font_size(soup):
   """ Takes soup and returns the <a> element representing
