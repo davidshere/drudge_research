@@ -3,8 +3,7 @@ import re
 import socket
 import requests
 
-from utils import TopAndSplashFinder
-
+from grab_main_and_splash import get_main_and_splash
 
 class DrudgeBase(object):
 
@@ -22,7 +21,6 @@ class DayPage(DrudgeBase):
         self.url = day_page_url
         self.drudge_date = drudge_date
         self.day_order = day_order
-
 
     def scrape_day_page(self):
         '''Goes through a day page and scrapes the links to the 
@@ -57,23 +55,11 @@ class DrudgePage(DrudgeBase):
         self.link_count = None
         self.id = id(self)  
 
-    def _top_and_splash_finder(self):
-      # if time/date > Oct 6, 2009 05:57:42 EXT (10:57:42 GMT)
-      try:
-        top = self.soup.find('div', {'id': 'drudgeTopHeadlines'})
-        top = top.find_all('a')
-        top = [link.text.encode('utf-8') for link in top]
-        splash = top.pop()
-        return {'top': top, 'splash': splash}
-      except:
-        return None
-
     def scrape(self):
         ''' scrape takes a url to an individual drudge page, and 
-            scrapes every link.  ''' 
-        finder = TopAndSplashFinder()              
+            scrapes every link.  '''        
         self.soup = self.fetch_page(self.url)
-        main_links = self._top_and_splash_finder()
+        main_links = get_main_and_splash()
         print "main links:"
         print main_links
         print

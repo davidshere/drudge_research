@@ -25,9 +25,8 @@ STOP_LINKS = (
 class ParseError(Exception):
   pass
 
-# this works on pages going back to mid 2009
+# going back to mid-2009
 def recent_top_splash_finder(soup):
-  # This works for all known iterations of the drudge report in the last six years
   top = soup.find('div', {'id': 'drudgeTopHeadlines'})
   if not top:
     raise ParseError("id: 'drudgeTopHeadlines' not found")
@@ -35,8 +34,7 @@ def recent_top_splash_finder(soup):
   splash = top.pop()
   return {'top': top, 'splash': splash}
 
-
-
+# before mid-2009
 def find_splash_with_font_size(soup):
   """ Takes soup and returns the <a> element representing
       the page splash.
