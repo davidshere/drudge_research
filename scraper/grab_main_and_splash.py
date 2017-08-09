@@ -22,11 +22,6 @@ STOP_LINKS = (
   u'<a href="http://www.drudgereport.com"><img border="0" height="85" src="http://www.drudgereport.com/logo9.gif" width="610"/></a>'
 )
 
-def load_html(page_number):
-  with open('splash_research/test_files/test_file_%d.html' % page_number, 'r') as f:
-    html = f.read()
-  return BeautifulSoup(html, 'lxml') 
-
 class ParseError(Exception):
   pass
 
@@ -91,13 +86,3 @@ def get_main_and_splash(soup):
     return recent_top_splash_finder(soup)
   except ParseError:
     return early_top_splash_finder(soup)
-
-if __name__ == '__main__':
-  top_splash_text_holder = {}
-  for i in range(24, 0, -1):
-    soup = load_html(i)
-    top_splash = get_main_and_splash(soup)
-    top_splash_text_holder[i] = top_splash_to_text(top_splash)
-
-  import pprint
-  pprint.pprint(top_splash_text_holder)

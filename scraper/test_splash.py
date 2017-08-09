@@ -100,6 +100,11 @@ def top_splash_to_text(top_and_splash):
     top_and_splash['top'] = [a.text for a in top_and_splash['top']]
   return top_and_splash
 
+def load_html(page_number):
+  with open('test/resources/test_file_%d.html' % page_number, 'r') as f:
+    html = f.read()
+  return BeautifulSoup(html, 'lxml') 
+
 
 class TopAndSplashTest(unittest.TestCase):
 
