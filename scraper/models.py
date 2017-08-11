@@ -1,4 +1,6 @@
-import socket
+import aiohttp
+import asyncio
+import collections
 import uuid
 
 from bs4 import BeautifulSoup
@@ -6,16 +8,23 @@ import requests
 
 from grab_main_and_splash import get_main_and_splash
 
-EMPTY_PAGE_LINK_COUNT = 10
+DAY_PAGE_FMT_URL = "http://www.drudgereportarchives.com/data/%s/%02d/%02d/index.htm?s=flag"
+EMPTY_PAGE_LINK_COUNT = 15
+
+DRUDGE_LINK_FIELD_NAMES = ['url', 'hed', 'is_top', 'is_splash', 'parent_drudge_page_id']
+DrudgeLink = collections.namedtuple("DrudgeLink", DRUDGE_LINK_FIELD_NAMES)
 
 class DrudgeBase(object):
-    def fetch_page(self):
+
+    async def fetch_page(self):
         ''' Fetches the html from a URL. Assumes the subclass
             has a self.url attribute 
         '''
-        request = requests.get(self.url)
-        html = request.text
-        return BeautifulSoup(html, 'lxml')
+        async with aiohttp.ClientSession() as session:
+            async with session.get(self.url) as response:
+                response = await response.read()
+
+        return BeautifulSoup(response, 'lxml')
 
 class DayPage(DrudgeBase):
     ''' Signifies a date, in UTC time.
@@ -24,9 +33,9 @@ class DayPage(DrudgeBase):
         It's main purpose is to represent a day page and scrape
         and process each iteration of the drudge report that day.
     '''
-    def __init__(self, day_page_url, drudge_date):
-        self.url = day_page_url
-        self.drudge_date = drudge_date
+    def __init__(self, dt):
+        self.url = DAY_PAGE_FMT_URL % (dt.year, dt.month, dt.day)
+        self.dt = dt
 
     def drudge_pages(self):
         '''Goes through a day page and scrapes the links to the 
@@ -47,25 +56,21 @@ class DayPage(DrudgeBase):
         page_links = []
         for i, page in enumerate(self.drudge_pages()):
             print(i, page.url)
-            links = [link for link in page.scrape()]
+            links = [link for link in page.get_links()]
             page_links.extend([link for link in page.scrape()])
         return page_links
 
 
 class DrudgePage(DrudgeBase):
     '''
-        One method to scrape the drudge page and produce a list(?) of drudge link objects
+        One method to scrape the drudge page and produce an iterator of drudge link objects
     '''
-    
-    socket.setdefaulttimeout(5)
-
     def __init__(self, url, time_str): 
         self.url = url
         self.time_str = time_str
-        self.link_count = None
         self.id = uuid.uuid4().hex
 
-    def scrape(self):
+    def get_links(self):
         ''' scrape takes a url to an individual drudge page, and 
             scrapes every link.  '''        
         soup = self.fetch_page()
@@ -73,9 +78,9 @@ class DrudgePage(DrudgeBase):
         if self._page_has_content(raw_links):
             main_links = get_main_and_splash(soup)
             for link in raw_links:
-
                 splash = False
                 top = False
+
                 url = link['href']
                 text = link.text.encode('utf-8')
 
@@ -88,31 +93,12 @@ class DrudgePage(DrudgeBase):
 
     def _page_has_content(self, links):
         """ Returns true if a drudge page has actual content. """
-        return len(links) >= EMPTY_PAGE_LINK_COUNT
+        return len(links) > EMPTY_PAGE_LINK_COUNT
 
-class DrudgeLink(object):
-    def __init__(self, 
-                 url, 
-                 hed, 
-                 parent_drudge_page_id,
-                 is_top = False, 
-                 is_splash = False):
-        self.url = url
-        self.hed = hed
-        self.is_top = is_top
-        self.is_splash = is_splash
-        self.parent_drudge_page_id = parent_drudge_page_id
-
-    def dump(self):
-        return [self.url,
-                self.hed,
-                self.top,
-                self.splash,
-                self.parent_drudge_page_id
-        ]
 
 if __name__ == "__main__":
     from archive_to_s3 import day_pages
     one = next(day_pages())
     links = one.get_days_links()
     print(links[:100])
+
