@@ -1,7 +1,6 @@
 import asyncio
 import collections
 import datetime
-import uuid
 
 from aiohttp import ClientSession
 from bs4 import BeautifulSoup
@@ -12,8 +11,10 @@ from grab_main_and_splash import get_main_and_splash
 DAY_PAGE_FMT_URL = "http://www.drudgereportarchives.com/data/%s/%02d/%02d/index.htm?s=flag"
 DRUDGE_PAGE_URL_PREFIX = 'http://www.drudgereportArchives.com/data/'
 
-DRUDGE_LINK_FIELD_NAMES = ['url', 'hed', 'link_order', 'is_top', 'is_splash', 'parent_drudge_page_id']
+DRUDGE_LINK_FIELD_NAMES = ['page_dt', 'url', 'hed', 'link_order', 'is_top', 'is_splash']
 DrudgeLink = collections.namedtuple("DrudgeLink", DRUDGE_LINK_FIELD_NAMES)
+
+SEMAPHORE_COUNT = 3
 
 class DayPage(object):
     ''' Signifies a date, in UTC time.
@@ -24,8 +25,6 @@ class DayPage(object):
     def __init__(self, dt):
         self.loop = asyncio.get_event_loop()
         self.url = DAY_PAGE_FMT_URL % (dt.year, dt.month, dt.day)
-        self.dt = dt
-        self._drudge_page_links = None
 
     def get_day_page(self):
         response = requests.get(self.url)
@@ -33,24 +32,24 @@ class DayPage(object):
 
     def drudge_page_from_drudge_page_url(self, link):
         url = link['href']
-        url_text = link.text.encode('utf-8').strip()
+        url_dt = url.split('/')[-1]
+        page_dt = datetime.datetime.strptime(url_dt, '%Y%m%d_%H%M%S.htm')
         return DrudgePage(
             url=url,
-            time_str=url_text
+            page_dt=page_dt
         )
 
-    @property
-    def drudge_page_links(self):
-        if self._drudge_page_links:
-            return self._drudge_page_links
-        else:
-            all_links = self.day_page.find_all('a')
-            self._drudge_page_links = []
-            for link in all_links:
-                page = self.drudge_page_from_drudge_page_url(link)
-                if page.url.startswith(DRUDGE_PAGE_URL_PREFIX) and page.time_str != b'^':
-                    self._drudge_page_links.append(page)
-        return self._drudge_page_links
+    def drudge_pages(self):
+        all_links = self.day_page.find_all('a')
+        links = []
+        for link in all_links:
+            try:
+                page = self.drudge_page_from_drudge_page_url(link, dt)
+                links.append(page)
+            except ValueError:
+                pass
+
+        return links
 
     async def bound_fetch_drudge_page(self, page, sem, session):
         async with sem:
@@ -69,10 +68,11 @@ class DayPage(object):
         # Create client session that will ensure we dont open new connection
         # per each request.
 
-        sem = asyncio.Semaphore(3)
+        sem = asyncio.Semaphore(SEMAPHORE_COUNT)
 
         async with ClientSession() as session:
-            for page in self.drudge_page_links:
+            pages = self.drudge_pages()
+            for page in pages:
                 task = asyncio.ensure_future(self.bound_fetch_drudge_page(page, sem, session))
                 tasks.append(task)
 
@@ -84,15 +84,12 @@ class DayPage(object):
         return self.loop.run_until_complete(future)
 
 class DrudgePage(object):
-    '''
-        One method to scrape the drudge page and produce an iterator of drudge link objects
-    '''
-    def __init__(self, url, time_str): 
-        self.url = url
-        self.time_str = time_str
-        self.id = uuid.uuid4().hex
 
-    def process_raw_links(self, link, page_main_links):
+    def __init__(self, url, page_dt):
+        self.url = url
+        self.page_dt = page_dt.isoformat()
+
+    def process_raw_link(self, link, page_main_links):
         splash = False
         top = False
 
@@ -103,7 +100,7 @@ class DrudgePage(object):
             splash = True
         if link.text in page_main_links['top']:
             top = True
-        return DrudgeLink(url, text, 'NA', top, splash, self.id)
+        return DrudgeLink(self.page_dt, url, text, 'NA', top, splash)
 
     def get_links(self):
         ''' scrape takes a url to an individual drudge page, and 
@@ -112,8 +109,7 @@ class DrudgePage(object):
         raw_links = soup.find_all('a')
         if self._page_has_content(soup):
             main_links = get_main_and_splash(soup)
-            return [self.process_raw_links(link, main_links) for link in raw_links]
-
+            return [self.process_raw_link(link, main_links) for link in raw_links]
 
     def _page_has_content(self, soup):
         """ Returns true if a drudge page has actual content. """
@@ -122,7 +118,7 @@ class DrudgePage(object):
 
 if __name__ == "__main__":
     start = datetime.datetime.now()
-    dt = datetime.date.today()
+    dt = datetime.date.today() - datetime.timedelta(days=1)
     dp = DayPage(dt)
     d = dp.scrape()
     links = []
