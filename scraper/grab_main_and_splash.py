@@ -9,17 +9,15 @@
 from bs4 import BeautifulSoup
 import urllib.parse
 
+from utils import DRUDGE_LOGO_LINKS
+
 STOP_DOMAINS = [
   'harvest.adgardener.com',
   'a.tribalfusion.com',
   'www.medintop.com'
 ]
 
-STOP_LINKS = (
-  '<a href="http://www.drudgereport.com/"><img border="0" height="85" src="http://www.drudgereport.com/logo9.gif" width="610"/></a>',
-  '<a href="http://www.drudgereport.com"><img border="0" height="85" src="http://www.drudgereport.com/logo9.gif" width="610"/></a>',
-  '<a href="http://www.drudgereport.com:80/"><img border="0" height="85" src="http://www.drudgereport.com:80/logo9.gif" width="610"/></a>'
-)
+
 
 class ParseError(Exception):
   pass
@@ -63,7 +61,7 @@ def get_early_top(links, found_splash):
     splash_index = links.index(found_splash)
   except ValueError:
     for link in links:
-      if link.decode() in STOP_LINKS:
+      if link.decode() in DRUDGE_LOGO_LINKS:
         splash_index = links.index(link)
 
   for j in range(splash_index-1, 0, -1):
