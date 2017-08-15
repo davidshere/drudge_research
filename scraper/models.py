@@ -11,10 +11,13 @@ from grab_main_and_splash import get_main_and_splash
 DAY_PAGE_FMT_URL = "http://www.drudgereportarchives.com/data/%s/%02d/%02d/index.htm?s=flag"
 DRUDGE_PAGE_URL_PREFIX = 'http://www.drudgereportArchives.com/data/'
 
-DRUDGE_LINK_FIELD_NAMES = ['page_dt', 'url', 'hed', 'link_order', 'is_top', 'is_splash']
+DRUDGE_LINK_FIELD_NAMES = ['page_dt', 'url', 'hed', 'is_top', 'is_splash']
 DrudgeLink = collections.namedtuple("DrudgeLink", DRUDGE_LINK_FIELD_NAMES)
 
 SEMAPHORE_COUNT = 3
+
+BYTES_TRUE = bytes(str(True), 'utf-8')
+BYTES_FALSE = bytes(str(False), 'utf-8')
 
 class DayPage(object):
     ''' Signifies a date, in UTC time.
@@ -44,7 +47,7 @@ class DayPage(object):
         links = []
         for link in all_links:
             try:
-                page = self.drudge_page_from_drudge_page_url(link, dt)
+                page = self.drudge_page_from_drudge_page_url(link)
                 links.append(page)
             except ValueError:
                 pass
@@ -57,7 +60,6 @@ class DayPage(object):
             return page
 
     async def fetch_drudge_page(self, url, session):
-        print(url)
         async with session.get(url) as response:
             return await response.read()
 
@@ -87,20 +89,23 @@ class DrudgePage(object):
 
     def __init__(self, url, page_dt):
         self.url = url
-        self.page_dt = page_dt.isoformat()
+        self.page_dt = page_dt.isoformat().encode()
 
     def process_raw_link(self, link, page_main_links):
-        splash = False
-        top = False
+        """ We're sending this up to S3 and it's all gotta
+            be bytes.
+        """
+        splash = BYTES_FALSE
+        top = BYTES_FALSE
 
-        url = link['href']
-        text = link.text.encode('utf-8')
+        url = link['href'].encode()
+        text = link.text.encode()
 
         if link.text == page_main_links['splash']:
-            splash = True
+            splash = BYTES_TRUE
         if link.text in page_main_links['top']:
-            top = True
-        return DrudgeLink(self.page_dt, url, text, 'NA', top, splash)
+            top = BYTES_TRUE
+        return DrudgeLink(self.page_dt, url, text, top, splash)
 
     def get_links(self):
         ''' scrape takes a url to an individual drudge page, and 
