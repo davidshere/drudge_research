@@ -20,11 +20,7 @@ BYTES_TRUE = bytes(str(True), 'utf-8')
 BYTES_FALSE = bytes(str(False), 'utf-8')
 
 class DayPage(object):
-    ''' Signifies a date, in UTC time.
 
-        It's main purpose is to represent a day page and scrape
-        and process each iteration of the drudge report that day.
-    '''
     def __init__(self, dt):
         self.loop = asyncio.get_event_loop()
         self.url = DAY_PAGE_FMT_URL % (dt.year, dt.month, dt.day)

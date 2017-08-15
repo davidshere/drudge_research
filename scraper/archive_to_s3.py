@@ -2,6 +2,7 @@ import datetime
 import io
 
 import boto3
+import dateutil
 
 from models import DayPage
 
@@ -16,17 +17,17 @@ def day_pages(start=START_DATE, end=datetime.date.today()):
     for dt in date_generator:
         yield DayPage(dt)
 
-
-
 if __name__ == "__main__":
     start = datetime.datetime.now()
     dt = datetime.date.today() - datetime.timedelta(days=1)
     dp = DayPage(dt)
-    d = dp.scrape()
     links = []
-    for link in d:
-        for item in link.get_links():
-            links.append(item)
+    for page in day_pages(START_DATE, START_DATE + dateutil.relativedelta.relativedelta(months=1)):
+        print(page.url)
+        page_links = dp.scrape()
+        for link in page_links:
+            for item in link.get_links():
+                links.append(item)
 
     s3 = boto3.resource('s3')
     f = io.BytesIO(b'\n'.join([b'\t'.join([a for a in l]) for l in links]))
