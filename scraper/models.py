@@ -14,10 +14,7 @@ DRUDGE_PAGE_URL_PREFIX = 'http://www.drudgereportArchives.com/data/'
 DRUDGE_LINK_FIELD_NAMES = ['page_dt', 'url', 'hed', 'is_top', 'is_splash']
 DrudgeLink = collections.namedtuple("DrudgeLink", DRUDGE_LINK_FIELD_NAMES)
 
-SEMAPHORE_COUNT = 3
-
-BYTES_TRUE = bytes(str(True), 'utf-8')
-BYTES_FALSE = bytes(str(False), 'utf-8')
+SEMAPHORE_COUNT = 5
 
 class DayPage(object):
 
@@ -30,13 +27,14 @@ class DayPage(object):
         return BeautifulSoup(response.content, 'lxml')
 
     def drudge_page_from_drudge_page_url(self, link):
-        url = link['href']
-        url_dt = url.split('/')[-1]
-        page_dt = datetime.datetime.strptime(url_dt, '%Y%m%d_%H%M%S.htm')
-        return DrudgePage(
-            url=url,
-            page_dt=page_dt
-        )
+        url = link.get('href')
+        if url:
+            url_dt = url.split('/')[-1]
+            page_dt = datetime.datetime.strptime(url_dt, '%Y%m%d_%H%M%S.htm')
+            return DrudgePage(
+                url=url,
+                page_dt=page_dt
+            )
 
     def drudge_pages(self):
         all_links = self.day_page.find_all('a')
@@ -44,7 +42,8 @@ class DayPage(object):
         for link in all_links:
             try:
                 page = self.drudge_page_from_drudge_page_url(link)
-                links.append(page)
+                if page:
+                    links.append(page)
             except ValueError:
                 pass
 
@@ -79,38 +78,45 @@ class DayPage(object):
     def scrape(self):
         self.day_page = self.get_day_page()
         future = asyncio.ensure_future(self.get_drudge_pages())
-        return self.loop.run_until_complete(future)
+        drudge_pages = self.loop.run_until_complete(future)
+        links = []
+        for page in drudge_pages:
+            links.extend(page.scrape_drudge_page())
+        return links
+
 
 class DrudgePage(object):
 
     def __init__(self, url, page_dt):
         self.url = url
-        self.page_dt = page_dt.isoformat().encode()
+        self.page_dt = page_dt
 
     def process_raw_link(self, link, page_main_links):
-        """ We're sending this up to S3 and it's all gotta
-            be bytes.
-        """
-        splash = BYTES_FALSE
-        top = BYTES_FALSE
+        url = link.get('href')
+        if url:
+            text = link.text
 
-        url = link['href'].encode()
-        text = link.text.encode()
+            splash = link.text == page_main_links['splash']
+            top = link.text in page_main_links['top']
 
-        if link.text == page_main_links['splash']:
-            splash = BYTES_TRUE
-        if link.text in page_main_links['top']:
-            top = BYTES_TRUE
-        return DrudgeLink(self.page_dt, url, text, top, splash)
+            return DrudgeLink(self.page_dt, url, text, top, splash)
 
-    def get_links(self):
+    def scrape_drudge_page(self):
         ''' scrape takes a url to an individual drudge page, and 
             scrapes every link.  '''
         soup = BeautifulSoup(self.html, 'lxml')
-        raw_links = soup.find_all('a')
+
+        processed_links = []
         if self._page_has_content(soup):
+
             main_links = get_main_and_splash(soup)
-            return [self.process_raw_link(link, main_links) for link in raw_links]
+            
+            for link in soup.find_all('a'):
+                processed_link = self.process_raw_link(link, main_links) 
+                if processed_link:
+                    processed_links.append(processed_link)
+
+        return processed_links
 
     def _page_has_content(self, soup):
         """ Returns true if a drudge page has actual content. """
@@ -119,10 +125,6 @@ class DrudgePage(object):
 
 if __name__ == "__main__":
     start = datetime.datetime.now()
-    dt = datetime.date.today() - datetime.timedelta(days=1)
+    dt = datetime.date.today() - datetime.timedelta(days=30)
     dp = DayPage(dt)
     d = dp.scrape()
-    links = []
-    for link in d:
-        for item in link.get_links():
-            links.append(item)
