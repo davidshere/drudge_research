@@ -4,6 +4,7 @@ import datetime
 import logging
 
 from aiohttp import ClientSession
+from aiohttp.errors import DisconnectedError, HttpProcessingError, ClientError
 from bs4 import BeautifulSoup
 import requests
 import retrying
@@ -18,6 +19,16 @@ DrudgeLink = collections.namedtuple("DrudgeLink", DRUDGE_LINK_FIELD_NAMES)
 
 SEMAPHORE_COUNT = 5
 
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)
+
+ch = logging.StreamHandler()
+ch.setLevel(logging.DEBUG)
+formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+ch.setFormatter(formatter)
+
+logger.addHandler(ch)
+
 class FetchError(Exception):
     pass
 
@@ -25,12 +36,13 @@ class DayPage(object):
 
     def __init__(self, dt):
         self.loop = asyncio.get_event_loop()
+        self.dt = dt
         self.url = DAY_PAGE_FMT_URL % (dt.year, dt.month, dt.day)
 
     def get_day_page(self):
         response = requests.get(self.url)
 
-        logging.info("Fetched Day Page for %s", self.dt.isotime())
+        logger.info("Fetched Day Page for %s", self.dt.isoformat())
         return BeautifulSoup(response.content, 'lxml')
 
     def drudge_page_from_drudge_page_url(self, link):
@@ -62,7 +74,10 @@ class DayPage(object):
             return page
 
     async def fetch_drudge_page(self, url, session):
+        if url == 'http://www.drudgereportArchives.com/data/2017/07/28/20170728_005802.htm':
+            raise Exception
         async with session.get(url) as response:
+            logger.info("Fetching drudge page at %s", url)
             return await response.read()
 
 
@@ -82,14 +97,16 @@ class DayPage(object):
 
             return await asyncio.gather(*tasks)
 
-    @retrying.retry(retry_on_exception=lambda exception: isinstance(exception, FetchError))
+    @retrying.retry(retry_on_exception=lambda exception: isinstance(exception, FetchError), stop_max_attempt_number=3)
     def scrape(self):
+        logger.info("Fetching Day Page for %s, url: %s", self.dt.isoformat(), self.url)
         try:
-            logging.info("Fetching Day Page for %s, url: %s", (self.dt.isotime(), self.url))
             self.day_page = self.get_day_page()
             future = asyncio.ensure_future(self.fetch_drudge_pages())
             drudge_pages = self.loop.run_until_complete(future)
-        except:
+        except (DisconnectedError, HttpProcessingError, ClientError) as e:
+            logger.error("Failure on %s, url: %s", self.dt.isoformat(), self.url)
+            logger.error("Error is %s ", e)
             raise FetchError
 
         links = []
@@ -128,6 +145,7 @@ class DrudgePage(object):
                 if processed_link:
                     processed_links.append(processed_link)
 
+        logger.info("Done processing %d links for %s", len(processed_links), self.page_dt)
         return processed_links
 
     def _page_has_content(self, soup):
@@ -141,3 +159,4 @@ if __name__ == "__main__":
     dp = DayPage(dt)
     d = dp.scrape()
     print(d[0])
+    print(len(d))
