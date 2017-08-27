@@ -3,6 +3,9 @@ import io
 
 import boto3
 import dateutil
+import pandas as pd
+import pyarrow as pa
+import pyarrow.parquet as pq
 
 from models import DayPage
 
@@ -18,17 +21,23 @@ def day_pages(start=START_DATE, end=datetime.date.today()):
         yield DayPage(dt)
 
 if __name__ == "__main__":
-    start = datetime.datetime.now()
-    dt = datetime.date.today() - datetime.timedelta(days=1)
-    dp = DayPage(dt)
+
     links = []
-    for page in day_pages(START_DATE, START_DATE + dateutil.relativedelta.relativedelta(months=1)):
+    for page in day_pages(START_DATE, START_DATE + dateutil.relativedelta.relativedelta(months=3)):
         print(page.url)
-        page_links = dp.scrape()
-        for link in page_links:
-            for item in link.get_links():
-                links.append(item)
+        page_links = page.scrape()
+        links.extend(page_links)
+
+    print(len(links))
+
+    df = pd.DataFrame(links)
+    df.to_csv('quarter_test.csv')
+    arrow_table = pa.Table.from_pandas(df)
+    pq.write_table(arrow_table, 'quarter_test.parquet')
+
+    buff = io.BytesIO()
+    pq.write_table(arrow_table, buff)
+    buff.seek(0)
 
     s3 = boto3.resource('s3')
-    f = io.BytesIO(b'\n'.join([b'\t'.join([a for a in l]) for l in links]))
-    s3.Object(BUCKET_NAME, 'data/2017/08/20170813.csv').put(Body=f)
+    s3.Object(BUCKET_NAME, 'quarter_test.parquet').put(Body=buff)
