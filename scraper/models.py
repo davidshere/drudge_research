@@ -1,10 +1,12 @@
 import asyncio
 import collections
 import datetime
+import logging
 
 from aiohttp import ClientSession
 from bs4 import BeautifulSoup
 import requests
+import retrying
 
 from grab_main_and_splash import get_main_and_splash
 
@@ -16,6 +18,9 @@ DrudgeLink = collections.namedtuple("DrudgeLink", DRUDGE_LINK_FIELD_NAMES)
 
 SEMAPHORE_COUNT = 5
 
+class FetchError(Exception):
+    pass
+
 class DayPage(object):
 
     def __init__(self, dt):
@@ -24,6 +29,8 @@ class DayPage(object):
 
     def get_day_page(self):
         response = requests.get(self.url)
+
+        logging.info("Fetched Day Page for %s", self.dt.isotime())
         return BeautifulSoup(response.content, 'lxml')
 
     def drudge_page_from_drudge_page_url(self, link):
@@ -59,7 +66,7 @@ class DayPage(object):
             return await response.read()
 
 
-    async def get_drudge_pages(self):
+    async def fetch_drudge_pages(self):
         tasks = []
 
         # Create client session that will ensure we dont open new connection
@@ -75,15 +82,20 @@ class DayPage(object):
 
             return await asyncio.gather(*tasks)
 
+    @retrying.retry(retry_on_exception=lambda exception: isinstance(exception, FetchError))
     def scrape(self):
-        self.day_page = self.get_day_page()
-        future = asyncio.ensure_future(self.get_drudge_pages())
-        drudge_pages = self.loop.run_until_complete(future)
+        try:
+            logging.info("Fetching Day Page for %s, url: %s", (self.dt.isotime(), self.url))
+            self.day_page = self.get_day_page()
+            future = asyncio.ensure_future(self.fetch_drudge_pages())
+            drudge_pages = self.loop.run_until_complete(future)
+        except:
+            raise FetchError
+
         links = []
         for page in drudge_pages:
             links.extend(page.scrape_drudge_page())
         return links
-
 
 class DrudgePage(object):
 
@@ -128,3 +140,4 @@ if __name__ == "__main__":
     dt = datetime.date.today() - datetime.timedelta(days=30)
     dp = DayPage(dt)
     d = dp.scrape()
+    print(d[0])
