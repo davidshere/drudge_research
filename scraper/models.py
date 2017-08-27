@@ -129,10 +129,9 @@ class DrudgePage(object):
     def scrape_drudge_page(self):
         ''' scrape takes a url to an individual drudge page, and 
             scrapes every link.  '''
-        soup = BeautifulSoup(self.html, 'lxml')
-
         processed_links = []
-        if self._page_has_content(soup):
+        if self._page_has_content(self.html):
+            soup = BeautifulSoup(self.html, 'lxml')
 
             main_links = get_main_and_splash(soup)
             
@@ -144,9 +143,9 @@ class DrudgePage(object):
         logger.info("Done processing %d links for %s", len(processed_links), self.page_dt)
         return processed_links
 
-    def _page_has_content(self, soup):
+    def _page_has_content(self, html):
         """ Returns true if a drudge page has actual content. """
-        return 'logo9.gif' in str(soup)
+        return b'logo9.gif' in html
 
 
 if __name__ == "__main__":
