@@ -3,8 +3,7 @@ import collections
 import datetime
 import logging
 
-from aiohttp import ClientSession
-from aiohttp.errors import DisconnectedError, HttpProcessingError, ClientError
+from aiohttp import ClientSession, ClientError
 from bs4 import BeautifulSoup
 import requests
 import retrying
@@ -74,8 +73,6 @@ class DayPage(object):
             return page
 
     async def fetch_drudge_page(self, url, session):
-        if url == 'http://www.drudgereportArchives.com/data/2017/07/28/20170728_005802.htm':
-            raise Exception
         async with session.get(url) as response:
             logger.info("Fetching drudge page at %s", url)
             return await response.read()
@@ -104,9 +101,8 @@ class DayPage(object):
             self.day_page = self.get_day_page()
             future = asyncio.ensure_future(self.fetch_drudge_pages())
             drudge_pages = self.loop.run_until_complete(future)
-        except (DisconnectedError, HttpProcessingError, ClientError) as e:
+        except ClientError as e:
             logger.error("Failure on %s, url: %s", self.dt.isoformat(), self.url)
-            logger.error("Error is %s ", e)
             raise FetchError
 
         links = []
