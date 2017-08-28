@@ -47,7 +47,7 @@ class ScraperRunner:
         pass
 
     def dt_to_year_half_str(self, dt):
-        return 'H%dY%d' % ((dt.month // 6 + 1), dt.year)
+        return 'H%dY%d' % ((dt.month - 1) // 6, dt.year)
 
     def _next_page_is_same_file(self, page):
         return self.dt_to_year_half_str(page.dt + datetime.timedelta(days=1)) == self.current_file
@@ -72,5 +72,5 @@ class ScraperRunner:
 
 if __name__ == "__main__":
 
-    runner = ScraperRunner(end_date=START_DATE + datetime.timedelta(days=2))
+    runner = ScraperRunner(end_date=START_DATE + datetime.timedelta(days=270))
     runner.run()
