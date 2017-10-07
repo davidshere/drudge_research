@@ -1,6 +1,6 @@
 import unittest
 
-from grab_main_and_splash import *
+from parse_main_and_splash import *
 
 EXPECTED_RESULTS = {
   1: {
@@ -184,7 +184,7 @@ class TopAndSplashTest(unittest.TestCase):
   def test_parser(self):
     for file_number in EXPECTED_RESULTS.keys():
       soup = load_html(file_number)
-      top_and_splash = top_splash_to_text(get_main_and_splash(soup))
+      top_and_splash = top_splash_to_text(parse_main_and_splash(soup))
       self.assertEqual(EXPECTED_RESULTS[file_number], top_and_splash)
 
 if __name__ == "__main__":

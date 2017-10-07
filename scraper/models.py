@@ -8,7 +8,7 @@ from bs4 import BeautifulSoup
 import requests
 import retrying
 
-from grab_main_and_splash import get_main_and_splash
+from parse_main_and_splash import parse_main_and_splash
 
 DAY_PAGE_FMT_URL = "http://www.drudgereportarchives.com/data/%s/%02d/%02d/index.htm?s=flag"
 DRUDGE_PAGE_URL_PREFIX = 'http://www.drudgereportArchives.com/data/'
@@ -133,7 +133,7 @@ class DrudgePage(object):
         if self._page_has_content(self.html):
             soup = BeautifulSoup(self.html, 'lxml')
 
-            main_links = get_main_and_splash(soup)
+            main_links = parse_main_and_splash(soup)
             
             for link in soup.find_all('a'):
                 processed_link = self.process_raw_link(link, main_links) 

@@ -72,5 +72,5 @@ class ScraperRunner:
 
 if __name__ == "__main__":
 
-    runner = ScraperRunner(end_date=START_DATE + datetime.timedelta(days=270))
+    runner = ScraperRunner()
     runner.run()

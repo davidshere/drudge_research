@@ -6,10 +6,8 @@
     here
 '''
 
-from bs4 import BeautifulSoup
+from bs4 import BeautifulSoup, Tag
 import urllib.parse
-
-from utils import DRUDGE_LOGO_LINKS
 
 STOP_DOMAINS = [
   'harvest.adgardener.com',
@@ -17,6 +15,7 @@ STOP_DOMAINS = [
   'www.medintop.com'
 ]
 
+LOGO_FILENAME = 'http://www.drudgereport.com/logo9.gif'
 
 
 class ParseError(Exception):
@@ -52,6 +51,18 @@ def find_splash_with_font_size(soup):
   if link != -1:
     return link
 
+def is_logo_link(element):
+  contents = element.contents
+  try:
+    is_right_length = len(contents) == 1
+    is_tag = isinstance(contents[0], Tag)
+    is_right_filename = contents[0].get('src') == LOGO_FILENAME
+
+    return is_right_length and is_tag and is_right_filename
+  except AttributeError:
+    return False
+
+
 def get_early_top(links, found_splash):
   top_links = []
 
@@ -61,8 +72,9 @@ def get_early_top(links, found_splash):
     splash_index = links.index(found_splash)
   except ValueError:
     for link in links:
-      if link.decode() in DRUDGE_LOGO_LINKS:
+      if is_logo_link(link):
         splash_index = links.index(link)
+        break
 
   for j in range(splash_index-1, 0, -1):
     parsed_url = urllib.parse.urlparse(links[j].get('href')).netloc.lower()
@@ -77,7 +89,7 @@ def early_top_splash_finder(soup):
   top = get_early_top(links, splash) or []
   return {'top': top, 'splash': splash}
 
-def get_main_and_splash(soup):
+def parse_main_and_splash(soup):
   try:
     return recent_top_splash_finder(soup)
   except ParseError:
