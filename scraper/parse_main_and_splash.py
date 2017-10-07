@@ -16,7 +16,7 @@ STOP_DOMAINS = [
   'www.medintop.com'
 ]
 
-LOGO_FILENAME = 'http://www.drudgereport.com/logo9.gif'
+LOGO_FILENAME = 'logo9.gif'
 
 NEW_HTML_BEGINS = datetime.datetime(2009, 10, 6, 5, 57, 42)
 
@@ -59,7 +59,7 @@ def is_logo_link(element):
   try:
     is_right_length = len(contents) == 1
     is_tag = isinstance(contents[0], Tag)
-    is_right_filename = contents[0].get('src') == LOGO_FILENAME
+    is_right_filename = contents[0].get('src').split('/')[-1] == LOGO_FILENAME
 
     return is_right_length and is_tag and is_right_filename
   except AttributeError:

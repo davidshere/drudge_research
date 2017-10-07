@@ -6,7 +6,12 @@ from parse_main_and_splash import *
 EARLY_DT = datetime.datetime(2001, 11, 19, 0, 0)
 LATE_DT = datetime.datetime(2017, 1, 1, 0, 0)
 
+#TODO: The keys here should be datetimes, not numbers. That will require going and finding each page again in the archive
 EXPECTED_RESULTS = {
+  0: {
+    'splash': None,
+    'top': []
+  },
   1: {
     'splash': 'ASHCROFT TO REQUIRE SOME VISITORS FINGERPRINTED',
     'top': []
