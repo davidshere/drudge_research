@@ -1,6 +1,10 @@
+import datetime
 import unittest
 
 from parse_main_and_splash import *
+
+EARLY_DT = datetime.datetime(2001, 11, 19, 0, 0)
+LATE_DT = datetime.datetime(2017, 1, 1, 0, 0)
 
 EXPECTED_RESULTS = {
   1: {
@@ -173,7 +177,7 @@ def top_splash_to_text(top_and_splash):
     top_and_splash['top'] = [a.text for a in top_and_splash['top']]
   return top_and_splash
 
-def load_html(page_number):
+def load_resource(page_number):
   with open('test/resources/test_file_%d.html' % page_number, 'r') as f:
     html = f.read()
   return BeautifulSoup(html, 'lxml') 
@@ -183,8 +187,12 @@ class TopAndSplashTest(unittest.TestCase):
 
   def test_parser(self):
     for file_number in EXPECTED_RESULTS.keys():
-      soup = load_html(file_number)
-      top_and_splash = top_splash_to_text(parse_main_and_splash(soup))
+      # need to simulate the datetimes that we're getting from a DayPage
+      file_dt = EARLY_DT if file_number <= 14 else LATE_DT
+
+      soup = load_resource(file_number)
+      top_and_splash = top_splash_to_text(parse_main_and_splash(soup, file_dt))
+
       self.assertEqual(EXPECTED_RESULTS[file_number], top_and_splash)
 
 if __name__ == "__main__":

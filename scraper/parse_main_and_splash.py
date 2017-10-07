@@ -5,6 +5,7 @@
     characters on the Drudge Report, and some of them we have to specify
     here
 '''
+import datetime
 
 from bs4 import BeautifulSoup, Tag
 import urllib.parse
@@ -16,6 +17,8 @@ STOP_DOMAINS = [
 ]
 
 LOGO_FILENAME = 'http://www.drudgereport.com/logo9.gif'
+
+NEW_HTML_BEGINS = datetime.datetime(2009, 10, 6, 5, 57, 42)
 
 
 class ParseError(Exception):
@@ -89,8 +92,8 @@ def early_top_splash_finder(soup):
   top = get_early_top(links, splash) or []
   return {'top': top, 'splash': splash}
 
-def parse_main_and_splash(soup):
-  try:
+def parse_main_and_splash(soup, page_dt):
+  if page_dt >= NEW_HTML_BEGINS:
     return recent_top_splash_finder(soup)
-  except ParseError:
+  else:
     return early_top_splash_finder(soup)
