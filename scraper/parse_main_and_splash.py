@@ -1,10 +1,3 @@
-#!/usr/local/bin/env python
-# -*- coding: latin-1 -*-
-
-''' We have to use funny encoding here because there are some non-ascii 
-    characters on the Drudge Report, and some of them we have to specify
-    here
-'''
 import datetime
 
 from bs4 import BeautifulSoup, Tag
