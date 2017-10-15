@@ -2,6 +2,7 @@ import asyncio
 import collections
 import datetime
 import logging
+import time
 
 from aiohttp import ClientSession, ClientError
 from bs4 import BeautifulSoup
@@ -31,8 +32,24 @@ logger.addHandler(ch)
 class FetchError(Exception):
     pass
 
-class DayPage(object):
+def transform_page_datetime(dt):
+    """
+    Transforms datetime to a timestamp. This is necessary for Spark to
+    be able to read the eventual parquet file. Pulling this into a separate
+    function because I may want to drop in a replacement transformation
+    in case of a different output format.
+    """
+    return time.mktime(dt.timetuple())
 
+class DayPage(object):
+    """
+    Represents the page on drudgereportarchives.com that contains
+    timestamped links to the individual Drudge snapshots, like
+    this: http://www.drudgereportarchives.com/data/2017/10/02/index.htm?s=flag
+
+    Handles all the behavior of asynchronously fetching the Drudge snapshots
+    and returning them.
+    """
     def __init__(self, dt):
         self.loop = asyncio.get_event_loop()
         self.dt = dt
@@ -49,6 +66,7 @@ class DayPage(object):
         if url:
             url_dt = url.split('/')[-1]
             page_dt = datetime.datetime.strptime(url_dt, '%Y%m%d_%H%M%S.htm')
+            page_dt = transform_page_datetime(page(dt))
             return DrudgePage(
                 url=url,
                 page_dt=page_dt
@@ -111,6 +129,7 @@ class DayPage(object):
         return links
 
 class DrudgePage(object):
+    """ Represents one an individual snapshot of the Drudge Report """
 
     def __init__(self, url, page_dt):
         self.url = url
