@@ -149,7 +149,7 @@ class DayPage(object):
 
             return await asyncio.gather(*tasks)
 
-    @retrying.retry(retry_on_exception=lambda exception: isinstance(exception, FetchError), stop_max_attempt_number=3)
+    #@retrying.retry(retry_on_exception=lambda exception: isinstance(exception, FetchError), stop_max_attempt_number=3)
     def process_day(self):
         logger.info("Fetching Day Page for %s, url: %s", self.dt.isoformat(), self.url)
 
@@ -181,9 +181,11 @@ class DayPage(object):
         # dump queue to list
 
         # add a poison pill
-        results.put(None)
+        sentinel_value = 'asdfljasef;ije'
+        results.put(sentinel_value)
         links = []
-        for i in iter(results.get, None):
+        for i in iter(results.get, sentinel_value):
+            print('whee')
             links.extend(i)
 
         return links
@@ -204,7 +206,6 @@ class DrudgePageScrapeHandler(multiprocessing.Process):
                 print('{}: Exiting'.format(proc_name))
                 self.task_queue.task_done()
                 break
-            print('{}: {}'.format(proc_name, page))
             links = page.drudge_page_to_links()
             self.task_queue.task_done()
             self.result_queue.put(links)
