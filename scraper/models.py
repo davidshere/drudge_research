@@ -2,6 +2,7 @@ import asyncio
 import collections
 import datetime
 import logging
+import multiprocessing
 import time
 
 from aiohttp import ClientSession, ClientError
@@ -18,6 +19,7 @@ DRUDGE_LINK_FIELD_NAMES = ['page_dt', 'url', 'hed', 'is_top', 'is_splash']
 DrudgeLink = collections.namedtuple("DrudgeLink", DRUDGE_LINK_FIELD_NAMES)
 
 SEMAPHORE_COUNT = 5
+PROCESS_COUNT = multiprocessing.cpu_count()
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
@@ -32,14 +34,46 @@ logger.addHandler(ch)
 class FetchError(Exception):
     pass
 
-def transform_page_datetime(dt):
-    """
-    Transforms datetime to a timestamp. This is necessary for Spark to
-    be able to read the eventual parquet file. Pulling this into a separate
-    function because I may want to drop in a replacement transformation
-    in case of a different output format.
-    """
-    return time.mktime(dt.timetuple())
+
+
+class DrudgePage(object):
+    """ Represents one an individual snapshot of the Drudge Report """
+
+    def __init__(self, url, page_dt):
+        self.url = url
+        self.page_dt = page_dt
+
+    def process_raw_link(self, link, page_main_links):
+        url = link.get('href')
+        if url:
+            text = link.text
+
+            splash = link.text == page_main_links['splash']
+            top = link.text in page_main_links['top']
+
+            return DrudgeLink(self.page_dt, url, text, top, splash)
+
+    def drudge_page_to_links(self):
+        ''' scrape takes a url to an individual drudge page, and 
+            scrapes every link.  '''
+        processed_links = []
+        if self._page_has_content(self.html):
+            soup = BeautifulSoup(self.html, 'lxml')
+
+            main_links = parse_main_and_splash(soup, self.page_dt)
+            
+            for link in soup.find_all('a'):
+                processed_link = self.process_raw_link(link, main_links) 
+                if processed_link:
+                    processed_links.append(processed_link)
+
+        logger.info("Done processing %d links for %s", len(processed_links), self.page_dt)
+        return processed_links
+
+    def _page_has_content(self, html):
+        """ Returns true if a drudge page has actual content. """
+        return b'logo9.gif' in html
+
 
 class DayPage(object):
     """
@@ -50,9 +84,10 @@ class DayPage(object):
     Handles all the behavior of asynchronously fetching the Drudge snapshots
     and returning them.
     """
-    def __init__(self, dt):
+    def __init__(self, dt, drudge_page_limit=None):
         self.loop = asyncio.get_event_loop()
         self.dt = dt
+        self.drudge_page_limit = drudge_page_limit
         self.url = DAY_PAGE_FMT_URL % (dt.year, dt.month, dt.day)
 
     def get_day_page(self):
@@ -66,15 +101,19 @@ class DayPage(object):
         if url:
             url_dt = url.split('/')[-1]
             page_dt = datetime.datetime.strptime(url_dt, '%Y%m%d_%H%M%S.htm')
-            page_dt = transform_page_datetime(page(dt))
             return DrudgePage(
                 url=url,
                 page_dt=page_dt
             )
 
     def drudge_pages(self):
+
         all_links = self.day_page.find_all('a')
         links = []
+
+        if self.drudge_page_limit:
+            all_links = all_links[:self.drudge_page_limit]
+
         for link in all_links:
             try:
                 page = self.drudge_page_from_drudge_page_url(link)
@@ -98,12 +137,10 @@ class DayPage(object):
 
     async def fetch_drudge_pages(self):
         tasks = []
+        sem = asyncio.Semaphore(SEMAPHORE_COUNT)
 
         # Create client session that will ensure we dont open new connection
         # per each request.
-
-        sem = asyncio.Semaphore(SEMAPHORE_COUNT)
-
         async with ClientSession() as session:
             pages = self.drudge_pages()
             for page in pages:
@@ -112,9 +149,12 @@ class DayPage(object):
 
             return await asyncio.gather(*tasks)
 
-    @retrying.retry(retry_on_exception=lambda exception: isinstance(exception, FetchError), stop_max_attempt_number=3)
-    def scrape(self):
+    #@retrying.retry(retry_on_exception=lambda exception: isinstance(exception, FetchError), stop_max_attempt_number=3)
+    def process_day(self):
         logger.info("Fetching Day Page for %s, url: %s", self.dt.isoformat(), self.url)
+        import time
+
+        fetch_start = time.time()
         try:
             self.day_page = self.get_day_page()
             future = asyncio.ensure_future(self.fetch_drudge_pages())
@@ -122,55 +162,56 @@ class DayPage(object):
         except ClientError as e:
             logger.error("Failure on %s, url: %s", self.dt.isoformat(), self.url)
             raise FetchError
-
+        fetch_end = time.time()
         links = []
+
+        p1_start = time.time()
         for page in drudge_pages:
-            links.extend(page.scrape_drudge_page())
+            links.extend(page.drudge_page_to_links())
+
+        p2_start = time.time()
+
+        # from https://stackoverflow.com/questions/6672525/multiprocessing-queue-in-python
+        def worker():
+            for page in iter(q.get, None):
+                print(len(results))
+                results.append(page.drudge_page_to_links())
+                q.task_done()
+            q.task_done()
+
+        process_q = multiprocessing.JoinableQueue()
+        procs = []
+        results = []
+        for i in range(PROCESS_COUNT):
+            procs.append(multiprocessing.Process(target=worker))
+            procs[-1].daemon = True
+            procs[-1].start()
+
+        for page in drudge_pages:
+            q.put(page)
+
+        q.join()
+
+        for p in procs:
+            q.put(None)
+
+        q.join()
+
+        for p in procs:
+            p.join()
+
+        print("fetch", fetch_end - fetch_start)
+        print("first process", time.time() - p1_start)
+        print("second process", time.time() - p2_start)
+        print(len(results))
+
         return links
-
-class DrudgePage(object):
-    """ Represents one an individual snapshot of the Drudge Report """
-
-    def __init__(self, url, page_dt):
-        self.url = url
-        self.page_dt = page_dt
-
-    def process_raw_link(self, link, page_main_links):
-        url = link.get('href')
-        if url:
-            text = link.text
-
-            splash = link.text == page_main_links['splash']
-            top = link.text in page_main_links['top']
-
-            return DrudgeLink(self.page_dt, url, text, top, splash)
-
-    def scrape_drudge_page(self):
-        ''' scrape takes a url to an individual drudge page, and 
-            scrapes every link.  '''
-        processed_links = []
-        if self._page_has_content(self.html):
-            soup = BeautifulSoup(self.html, 'lxml')
-
-            main_links = parse_main_and_splash(soup, self.page_dt)
-            
-            for link in soup.find_all('a'):
-                processed_link = self.process_raw_link(link, main_links) 
-                if processed_link:
-                    processed_links.append(processed_link)
-
-        logger.info("Done processing %d links for %s", len(processed_links), self.page_dt)
-        return processed_links
-
-    def _page_has_content(self, html):
-        """ Returns true if a drudge page has actual content. """
-        return b'logo9.gif' in html
 
 
 if __name__ == "__main__":
     start = datetime.datetime.now()
     dt = datetime.date.today() - datetime.timedelta(days=30)
-    dp = DayPage(dt)
-    d = dp.scrape()
+    dp = DayPage(dt, drudge_page_limit=50)
+    d = dp.process_day()
     print(d[0])
     print(len(d))

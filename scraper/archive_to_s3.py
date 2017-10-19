@@ -22,7 +22,7 @@ def structured_links_to_s3(links, fname, logger=None):
     arrow_table = pa.Table.from_pandas(df)
 
     buff = io.BytesIO()
-    pq.write_table(arrow_table, buff)
+    pq.write_table(arrow_table, buff, flavor='spark')
     buff.seek(0)
 
     s3 = boto3.resource('s3')
@@ -33,18 +33,22 @@ def structured_links_to_s3(links, fname, logger=None):
 
     return success
 
+def scructured_links_to_disk(links, fname, logger=None):
+    df = pd.DataFrame(links)
+    pd.to_csv(fname)
+
 def day_pages(start=START_DATE, end=datetime.date.today()):
     date_generator = (start + datetime.timedelta(days) for days in range((end-start).days))
     for dt in date_generator:
         yield DayPage(dt)
 
 class ScraperRunner:
-    def __init__(self, start_date=START_DATE, end_date=END_DATE):
+    def __init__(self, start_date=START_DATE, end_date=END_DATE, output_fn=structured_links_to_s3):
         self.start_date = start_date
         self.end_date = end_date
         self.current_file = self.dt_to_year_half_str(start_date)
         self.current_links = []
-        pass
+        self.output_fn = output_fn
 
     def dt_to_year_half_str(self, dt):
         return 'H%dY%d' % ((dt.month - 1) // 6, dt.year)
@@ -66,11 +70,13 @@ class ScraperRunner:
                 filename = S3_LOCATION_FMT.format(yearhalf=self.dt_to_year_half_str(page.dt))
 
                 logger.info("Beginning transform of links to parquet and posting to S3 for %s", filename)
-                structured_links_to_s3(self.current_links, filename, logger)
+                self.output_fn(structured_links_to_s3, self.current_links, filename, logger)
                 self.current_links = []
                 self.current_file = self.dt_to_year_half_str(page.dt)
 
 if __name__ == "__main__":
 
-    runner = ScraperRunner()
+
+    end_date = START_DATE + datetime.timedelta(days=1)
+    runner = ScraperRunner(end_date=end_date, output_fn=scructured_links_to_disk)
     runner.run()
