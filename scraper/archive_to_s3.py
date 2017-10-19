@@ -61,7 +61,7 @@ class ScraperRunner:
 
     def run(self):
         for page in day_pages(self.start_date, self.end_date):
-            page_links = page.scrape()
+            page_links = page.process_day()
 
             # should the next page be a different file?
             if self._next_page_is_same_file(page) and not self._next_page_is_end_date(page):
@@ -77,6 +77,6 @@ class ScraperRunner:
 if __name__ == "__main__":
 
 
-    end_date = START_DATE + datetime.timedelta(days=1)
-    runner = ScraperRunner(end_date=end_date, output_fn=scructured_links_to_disk)
+    end_date = START_DATE + datetime.timedelta(days=10)
+    runner = ScraperRunner(end_date=end_date)
     runner.run()

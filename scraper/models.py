@@ -25,7 +25,7 @@ logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
 
 ch = logging.StreamHandler()
-ch.setLevel(logging.DEBUG)
+ch.setLevel(logging.INFO)
 formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 ch.setFormatter(formatter)
 
@@ -149,10 +149,9 @@ class DayPage(object):
 
             return await asyncio.gather(*tasks)
 
-    #@retrying.retry(retry_on_exception=lambda exception: isinstance(exception, FetchError), stop_max_attempt_number=3)
+    @retrying.retry(retry_on_exception=lambda exception: isinstance(exception, FetchError), stop_max_attempt_number=3)
     def process_day(self):
         logger.info("Fetching Day Page for %s, url: %s", self.dt.isoformat(), self.url)
-        import time
 
         fetch_start = time.time()
         try:
@@ -162,56 +161,57 @@ class DayPage(object):
         except ClientError as e:
             logger.error("Failure on %s, url: %s", self.dt.isoformat(), self.url)
             raise FetchError
-        fetch_end = time.time()
-        links = []
 
-        p1_start = time.time()
+
+        tasks = multiprocessing.JoinableQueue()
+        results = multiprocessing.Queue()
+        consumers = [DrudgePageScrapeHandler(tasks, results) for _ in range(PROCESS_COUNT)]
+
+        for proc in consumers:
+            proc.start()
+
         for page in drudge_pages:
-            links.extend(page.drudge_page_to_links())
+            tasks.put(page)
 
-        p2_start = time.time()
-
-        # from https://stackoverflow.com/questions/6672525/multiprocessing-queue-in-python
-        def worker():
-            for page in iter(q.get, None):
-                print(len(results))
-                results.append(page.drudge_page_to_links())
-                q.task_done()
-            q.task_done()
-
-        process_q = multiprocessing.JoinableQueue()
-        procs = []
-        results = []
         for i in range(PROCESS_COUNT):
-            procs.append(multiprocessing.Process(target=worker))
-            procs[-1].daemon = True
-            procs[-1].start()
+            tasks.put(None)
 
-        for page in drudge_pages:
-            q.put(page)
+        tasks.join()
 
-        q.join()
+        # dump queue to list
 
-        for p in procs:
-            q.put(None)
-
-        q.join()
-
-        for p in procs:
-            p.join()
-
-        print("fetch", fetch_end - fetch_start)
-        print("first process", time.time() - p1_start)
-        print("second process", time.time() - p2_start)
-        print(len(results))
+        # add a poison pill
+        results.put(None)
+        links = []
+        for i in iter(results.get, None):
+            links.extend(i)
 
         return links
+
+class DrudgePageScrapeHandler(multiprocessing.Process):
+
+    def __init__(self, task_queue, result_queue):
+        multiprocessing.Process.__init__(self)
+        self.task_queue = task_queue
+        self.result_queue = result_queue
+
+    def run(self):
+        proc_name = self.name
+        while True:
+            page = self.task_queue.get()
+            if page is None:
+                # Poison pill means shutdown
+                print('{}: Exiting'.format(proc_name))
+                self.task_queue.task_done()
+                break
+            print('{}: {}'.format(proc_name, page))
+            links = page.drudge_page_to_links()
+            self.task_queue.task_done()
+            self.result_queue.put(links)
 
 
 if __name__ == "__main__":
     start = datetime.datetime.now()
     dt = datetime.date.today() - datetime.timedelta(days=30)
-    dp = DayPage(dt, drudge_page_limit=50)
+    dp = DayPage(dt)
     d = dp.process_day()
-    print(d[0])
-    print(len(d))
