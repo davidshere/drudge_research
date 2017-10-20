@@ -173,7 +173,7 @@ class DayPage(object):
         for page in drudge_pages:
             tasks.put(page)
 
-        for i in range(PROCESS_COUNT):
+        for _ in range(PROCESS_COUNT):
             tasks.put(None)
 
         tasks.join()
@@ -181,12 +181,14 @@ class DayPage(object):
         # dump queue to list
 
         # add a poison pill
-        sentinel_value = 'asdfljasef;ije'
-        results.put(sentinel_value)
+        results.put(None)
         links = []
-        for i in iter(results.get, sentinel_value):
-            print('whee')
+        for i in iter(results.get, None):
             links.extend(i)
+
+        for proc in consumers:
+            proc.terminate()
+
 
         return links
 
@@ -212,7 +214,9 @@ class DrudgePageScrapeHandler(multiprocessing.Process):
 
 
 if __name__ == "__main__":
+    x = time.time()
     start = datetime.datetime.now()
     dt = datetime.date.today() - datetime.timedelta(days=30)
     dp = DayPage(dt)
     d = dp.process_day()
+    print("day took", time.time() - x)
