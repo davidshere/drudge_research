@@ -57,7 +57,7 @@ class DrudgePage(object):
         ''' scrape takes a url to an individual drudge page, and 
             scrapes every link.  '''
         processed_links = []
-        if self._page_has_content(self.html):
+        if hasattr(self, 'html') and self._page_has_content(self.html):
             soup = BeautifulSoup(self.html, 'lxml')
 
             main_links = parse_main_and_splash(soup, self.page_dt)
@@ -86,6 +86,8 @@ class DayPage(object):
     """
     def __init__(self, dt, drudge_page_limit=None):
         self.loop = asyncio.get_event_loop()
+        self.loop.set_debug(True)
+
         self.dt = dt
         self.drudge_page_limit = drudge_page_limit
         self.url = DAY_PAGE_FMT_URL % (dt.year, dt.month, dt.day)
@@ -106,7 +108,7 @@ class DayPage(object):
                 page_dt=page_dt
             )
 
-    def drudge_pages(self):
+    def get_one_days_drudge_pages(self):
 
         all_links = self.day_page.find_all('a')
         links = []
@@ -118,6 +120,7 @@ class DayPage(object):
             try:
                 page = self.drudge_page_from_drudge_page_url(link)
                 if page:
+                    self.tasks.put(page)
                     links.append(page)
             except ValueError:
                 pass
@@ -127,56 +130,70 @@ class DayPage(object):
     async def bound_fetch_drudge_page(self, page, sem, session):
         async with sem:
             page.html = await self.fetch_drudge_page(page.url, session)
+            self.tasks.put(page)
             return page
 
     async def fetch_drudge_page(self, url, session):
         async with session.get(url) as response:
             logger.info("Fetching drudge page at %s", url)
-            return await response.read()
+
+            # this returns a list, we only want one item
+            response = await asyncio.gather(response.read())
+            response = response[0]
+            #logger.info("return \n%s" % response[:10])
+            #logger.info("return \n%s" % type(response))
+            return response
 
 
-    async def fetch_drudge_pages(self):
+
+    async def fetch_drudge_page_tasks(self):
         tasks = []
         sem = asyncio.Semaphore(SEMAPHORE_COUNT)
 
         # Create client session that will ensure we dont open new connection
         # per each request.
         async with ClientSession() as session:
-            pages = self.drudge_pages()
+            pages = self.get_one_days_drudge_pages()
             for page in pages:
                 task = asyncio.ensure_future(self.bound_fetch_drudge_page(page, sem, session))
+                print(task)
                 tasks.append(task)
+            #return await tasks
 
             return await asyncio.gather(*tasks)
 
     #@retrying.retry(retry_on_exception=lambda exception: isinstance(exception, FetchError), stop_max_attempt_number=3)
     def process_day(self):
+        self.tasks = multiprocessing.JoinableQueue()
+
+        results = multiprocessing.Queue()
+        self.consumers = [DrudgePageScrapeHandler(self.tasks, results) for _ in range(PROCESS_COUNT)]
+
+        for proc in self.consumers:
+            proc.start()     
+
         logger.info("Fetching Day Page for %s, url: %s", self.dt.isoformat(), self.url)
 
         fetch_start = time.time()
         try:
             self.day_page = self.get_day_page()
-            future = asyncio.ensure_future(self.fetch_drudge_pages())
-            drudge_pages = self.loop.run_until_complete(future)
+            future = asyncio.ensure_future(self.fetch_drudge_page_tasks())
+            self.loop.run_until_complete(future)
+
+
         except ClientError as e:
             logger.error("Failure on %s, url: %s", self.dt.isoformat(), self.url)
             raise FetchError
 
 
-        tasks = multiprocessing.JoinableQueue()
-        results = multiprocessing.Queue()
-        consumers = [DrudgePageScrapeHandler(tasks, results) for _ in range(PROCESS_COUNT)]
-
-        for proc in consumers:
-            proc.start()
-
-        for page in drudge_pages:
-            tasks.put(page)
-
         for _ in range(PROCESS_COUNT):
-            tasks.put(None)
+            self.tasks.put(None)
 
-        tasks.join()
+        self.tasks.join()
+
+
+
+
 
         # dump queue to list
 
@@ -186,7 +203,7 @@ class DayPage(object):
         for i in iter(results.get, None):
             links.extend(i)
 
-        for proc in consumers:
+        for proc in self.consumers:
             proc.terminate()
 
 
