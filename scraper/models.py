@@ -147,7 +147,8 @@ class DayPage(object):
         for link in all_links:
             try:
                 page = self._drudge_page_from_drudge_page_url(link)
-                if page:
+                # there are two links to each Drudge Page
+                if page and link.text != '^':
                     links.append(page)
             except ValueError:
                 pass
