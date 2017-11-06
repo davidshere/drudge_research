@@ -8,7 +8,6 @@ import time
 from aiohttp import ClientSession, ClientError
 from bs4 import BeautifulSoup
 import requests
-import retrying
 
 from parse_main_and_splash import parse_main_and_splash
 
@@ -22,9 +21,9 @@ PROCESS_COUNT = multiprocessing.cpu_count()
 
 # Set up logging. This can't be the best way...
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG)
+logger.setLevel(logging.WARN)
 ch = logging.StreamHandler()
-ch.setLevel(logging.INFO)
+ch.setLevel(logging.WARN)
 formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 ch.setFormatter(formatter)
 logger.addHandler(ch)
@@ -42,12 +41,11 @@ class DrudgePage(object):
     def process_raw_link(self, link, page_main_links):
         url = link.get('href')
         if url:
-            text = link.text
+            # determine if the link is in the top or the splash
+            splash = link == page_main_links['splash']
+            top = link in page_main_links['top']
 
-            splash = link.text == page_main_links['splash']
-            top = link.text in page_main_links['top']
-
-            return DrudgeLink(self.page_dt, url, text, top, splash)
+            return DrudgeLink(self.page_dt, url, link.text, top, splash)
 
     def drudge_page_to_links(self):
         ''' scrape takes a url to an individual drudge page, and 
@@ -57,7 +55,6 @@ class DrudgePage(object):
             soup = BeautifulSoup(self.html, 'lxml')
 
             main_links = parse_main_and_splash(soup, self.page_dt)
-            
             for link in soup.find_all('a'):
                 processed_link = self.process_raw_link(link, main_links) 
                 if processed_link:
@@ -80,12 +77,11 @@ class DayPage(object):
     Handles all the behavior of asynchronously fetching the Drudge snapshots
     and scheduling them to be processed.
     """
-    def __init__(self, dt, drudge_page_limit=None):
+    def __init__(self, dt):
         self._loop = asyncio.get_event_loop()
-        self._loop.set_debug(True)
+        #self._loop.set_debug(True)
 
         self.dt = dt
-        self.drudge_page_limit = drudge_page_limit
         self.url = DAY_PAGE_FMT_URL % (dt.year, dt.month, dt.day)
 
     def _prep_queues(self):
@@ -106,12 +102,21 @@ class DayPage(object):
     def _processed_page_queue_to_links(self):
         """
         Takes a queue filled with lists of DrudgeLinks and returns
-        a single list of links
+        a single list of links.
+
+        We're waiting until we have popped everything in the queue
+        to add the poison pill. That is not how the tutorials do it,
+        but it worked. So we're doing it.
         """
-        self._processed_page_queue.put(None)
         links = []
-        for i in iter(self._processed_page_queue.get, None):
-            links.extend(i)
+
+        for i, page_links in enumerate(iter(self._processed_page_queue.get, 'STOP')):
+
+            if i == self.num_pages - 1:
+                self._processed_page_queue.put('STOP')
+            
+            links.extend(page_links)
+
         return links
 
     def _get_day_page(self):
@@ -132,7 +137,7 @@ class DayPage(object):
                 page_dt=page_dt
             )
 
-    def _get_one_days_drudge_pages(self, page_limit=None):
+    def _get_one_days_drudge_pages(self, page_limit):
         """
         Transforms a Day Page's HTML into a list of links
         to individual drudge pages. Returns a list of
@@ -140,9 +145,6 @@ class DayPage(object):
         """
         all_links = self.day_page.find_all('a')
         links = []
-
-        if self.drudge_page_limit:
-            all_links = all_links[:page_limit]
 
         for link in all_links:
             try:
@@ -152,6 +154,10 @@ class DayPage(object):
                     links.append(page)
             except ValueError:
                 pass
+
+        if page_limit:
+            print('page_limit %s' % page_limit)
+            links = links[:page_limit]
 
         return links
 
@@ -164,24 +170,26 @@ class DayPage(object):
         page.html = response[0]
         self._task_queue.put(page)
 
-    async def _generate_fetch_tasks(self):
+    async def _generate_fetch_tasks(self, page_limit):
         tasks = []
         sem = asyncio.Semaphore(SEMAPHORE_COUNT)
 
         # Create client session that will ensure we dont open new connection
         # per each request.
         async with ClientSession() as session:
-            pages = self._get_one_days_drudge_pages(self.drudge_page_limit)
+            pages = self._get_one_days_drudge_pages(page_limit)
+            self.num_pages = len(pages)
             for page in pages:
                 task = asyncio.ensure_future(self._fetch_drudge_page(page, sem, session))
                 tasks.append(task)
             return await asyncio.gather(*tasks)
 
-    #@retrying.retry(retry_on_exception=lambda exception: isinstance(exception, FetchError), stop_max_attempt_number=3)
-    def process_day(self):
+    def process_day(self, page_limit=None):
         """
         Primary public method. Used to fetch one day's worth of links
         from the drudge archive.
+
+        set page_limit if you only want say the first 10 drudge pages
         """
         # instantiate queues and processes for processing the results
         self._prep_queues()
@@ -191,8 +199,11 @@ class DayPage(object):
         # schedule async fetch tasks
         try:
             self.day_page = self._get_day_page()
-            future = asyncio.ensure_future(self._generate_fetch_tasks())
+            future = asyncio.ensure_future(self._generate_fetch_tasks(page_limit))
             self._loop.run_until_complete(future)
+
+            # Try adding the 
+
         except ClientError as e:
             logger.error("Failure on %s, url: %s", self.dt.isoformat(), self.url)
             raise FetchError
@@ -203,6 +214,7 @@ class DayPage(object):
 
         # block execution until the queues are empty
         self._task_queue.join()
+
         links = self._processed_page_queue_to_links()
 
         # turn off processes
@@ -233,14 +245,18 @@ class DrudgePageScrapeHandler(multiprocessing.Process):
                 self.task_queue.task_done()
                 break
             links = page.drudge_page_to_links()
-            self.task_queue.task_done()
+
             self.result_queue.put(links)
+            self.task_queue.task_done()
+
 
 
 if __name__ == "__main__":
     x = time.time()
     start = datetime.datetime.now()
     dt = datetime.date.today() - datetime.timedelta(days=30)
+
     dp = DayPage(dt)
     d = dp.process_day()
     print("day took", time.time() - x)
+    print("processed %d pages" % len(set(a.page_dt for a in d)))
