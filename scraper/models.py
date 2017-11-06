@@ -53,12 +53,23 @@ class DrudgePage(object):
         processed_links = []
         if hasattr(self, 'html') and self._page_has_content(self.html):
             soup = BeautifulSoup(self.html, 'lxml')
+            all_links = soup.find_all('a')
+
+            # a basically blank page with a drudge logo will
+            # still get past our _page_has_content filter
+            #
+            # an empty page, as far as I've seen, has 16 total links
+            # on the archive. So, as a last resort, we'll make sure
+            # we have at least that many links
+            if len(all_links) <= 16:
+                return []
 
             main_links = parse_main_and_splash(soup, self.page_dt)
-            for link in soup.find_all('a'):
+            for link in all_links:
                 processed_link = self.process_raw_link(link, main_links) 
                 if processed_link:
                     processed_links.append(processed_link)
+
 
         logger.info("Done processing %d links for %s", len(processed_links), self.page_dt)
         return processed_links
