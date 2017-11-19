@@ -37,7 +37,6 @@ class ScrapeTests(unittest.TestCase):
 		page = DayPage(sample_date)
 		self.assertTrue(self.runner._should_scraped_pages_should_be_written_to_disk(page))
 
-
 		self.runner.current_file = 'H2Y2016'
 		self.runner.end_date = datetime.datetime(2017, 1, 3)
 		sample_date = datetime.datetime(2016, 12, 30)
