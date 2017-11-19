@@ -12,18 +12,24 @@ import requests
 from parse_main_and_splash import parse_main_and_splash
 
 DAY_PAGE_FMT_URL = "http://www.drudgereportarchives.com/data/%s/%02d/%02d/index.htm?s=flag"
-
-DRUDGE_LINK_FIELD_NAMES = ['page_dt', 'url', 'hed', 'is_top', 'is_splash']
-DrudgeLink = collections.namedtuple("DrudgeLink", DRUDGE_LINK_FIELD_NAMES)
+MIN_START_DATE = datetime.date(2001, 11, 18)
 
 SEMAPHORE_COUNT = 5
 PROCESS_COUNT = multiprocessing.cpu_count()
 
+DrudgeLink = collections.namedtuple("DrudgeLink", [
+    'page_dt',
+    'url',
+    'hed',
+    'is_top',
+    'is_splash'
+])
+
 # Set up logging. This can't be the best way...
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.WARN)
+logger.setLevel(logging.INFO)
 ch = logging.StreamHandler()
-ch.setLevel(logging.WARN)
+ch.setLevel(logging.INFO)
 formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 ch.setFormatter(formatter)
 logger.addHandler(ch)
@@ -91,22 +97,24 @@ class DayPage(object):
     def __init__(self, dt):
         self._loop = asyncio.get_event_loop()
         #self._loop.set_debug(True)
-
+        #if dt < MIN_START_DATE or dt < datetime.date.today():
+        #    raise Exception("Cannot process date %s, must be between %s and today" % (dt, datetime.date.today()))
+        
         self.dt = dt
         self.url = DAY_PAGE_FMT_URL % (dt.year, dt.month, dt.day)
+        self._task_queue = multiprocessing.JoinableQueue()
+        self._processed_page_queue = multiprocessing.Queue()
 
     def _prep_queues(self):
         """
         This method instantiates the queues and processes that we'll use
         to handle turning the fetched HTML into lists of links.
         """
-        self._task_queue = multiprocessing.JoinableQueue()
-        self._processed_page_queue = multiprocessing.Queue()
-
         self._consumers = [
             DrudgePageScrapeHandler(self._task_queue, self._processed_page_queue)
             for _ in range(PROCESS_COUNT)
         ]
+
         for proc in self._consumers:
             proc.start()
 
@@ -148,29 +156,33 @@ class DayPage(object):
                 page_dt=page_dt
             )
 
-    def _get_one_days_drudge_pages(self, page_limit):
+    def _link_is_drudge_page(self, link):
+        return link.get('href').lower().startswith('http://www.drudgereportarchives.com/data/')
+
+    def _prepare_drudge_pages_for_fetching(self, page_limit):
         """
         Transforms a Day Page's HTML into a list of links
-        to individual drudge pages. Returns a list of
-        DrudgePage objects.
+        to individual drudge pages. If valid links are found,
+        calls self._prep_queues(). Returns a list of DrudgePage objects.
         """
         all_links = self.day_page.find_all('a')
-        links = []
-
-        for link in all_links:
-            try:
-                page = self._drudge_page_from_drudge_page_url(link)
-                # there are two links to each Drudge Page
-                if page and link.text != '^':
-                    links.append(page)
-            except ValueError:
-                pass
+        links_to_drudge_pages = [link for link in all_links if self._link_is_drudge_page(link)]
+        drudge_pages = []
+        for link in links_to_drudge_pages:
+            page = self._drudge_page_from_drudge_page_url(link)
+            # there are two links to each Drudge Page
+            if page and link.text != '^':
+                drudge_pages.append(page)
 
         if page_limit:
-            print('page_limit %s' % page_limit)
-            links = links[:page_limit]
+            drudge_pages = drudge_pages[:page_limit]
 
-        return links
+        self.has_valid_drudge_page_links = False
+        if drudge_pages:
+            self.has_valid_drudge_page_links = True
+            self._prep_queues()
+
+        return drudge_pages
 
     async def _fetch_drudge_page(self, page, sem, session):
         logger.info("Fetching drudge page at %s", page.url)
@@ -188,11 +200,12 @@ class DayPage(object):
         # Create client session that will ensure we dont open new connection
         # per each request.
         async with ClientSession() as session:
-            pages = self._get_one_days_drudge_pages(page_limit)
-            self.num_pages = len(pages)
-            for page in pages:
-                task = asyncio.ensure_future(self._fetch_drudge_page(page, sem, session))
-                tasks.append(task)
+            pages = self._prepare_drudge_pages_for_fetching(page_limit)
+            if pages:
+                self.num_pages = len(pages)
+                for page in pages:
+                    task = asyncio.ensure_future(self._fetch_drudge_page(page, sem, session))
+                    tasks.append(task)
             return await asyncio.gather(*tasks)
 
     def process_day(self, page_limit=None):
@@ -202,10 +215,8 @@ class DayPage(object):
 
         set page_limit if you only want say the first 10 drudge pages
         """
-        # instantiate queues and processes for processing the results
-        self._prep_queues()
-
         logger.info("Fetching Day Page for %s, url: %s", self.dt.isoformat(), self.url)
+        links = []
 
         # schedule async fetch tasks
         try:
@@ -220,17 +231,18 @@ class DayPage(object):
             raise FetchError
 
         # add poison pills so the queue will know when to stop
-        for _ in range(PROCESS_COUNT):
-            self._task_queue.put(None)
+        if self.has_valid_drudge_page_links:
+            for _ in range(PROCESS_COUNT):
+                self._task_queue.put(None)
 
-        # block execution until the queues are empty
-        self._task_queue.join()
+            # block execution until the queues are empty
+            self._task_queue.join()
 
-        links = self._processed_page_queue_to_links()
+            links = self._processed_page_queue_to_links()
 
-        # turn off processes
-        for proc in self._consumers:
-            proc.terminate()
+            # turn off processes
+            for proc in self._consumers:
+                proc.terminate()
 
         return links
 
@@ -252,7 +264,7 @@ class DrudgePageScrapeHandler(multiprocessing.Process):
             page = self.task_queue.get()
             if page is None:
                 # Poison pill means shutdown
-                print('{}: Exiting'.format(proc_name))
+                logger.info('{}: Exiting'.format(proc_name))
                 self.task_queue.task_done()
                 break
             links = page.drudge_page_to_links()
@@ -266,6 +278,7 @@ if __name__ == "__main__":
     x = time.time()
     start = datetime.datetime.now()
     dt = datetime.date.today() - datetime.timedelta(days=30)
+    dt = datetime.datetime(2002, 9, 21)
 
     dp = DayPage(dt)
     d = dp.process_day()
