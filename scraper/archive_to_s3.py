@@ -16,7 +16,6 @@ S3_LOCATION_FMT = 'data/{yearhalf}.parquet'
 START_DATE = datetime.date(2001, 11, 18)
 END_DATE = datetime.date.today()
 
-#@retrying.retry(stop_max_attempt_number=5)
 def structured_links_to_s3(links, fname, logger=None):
     df = pd.DataFrame(links)
     arrow_table = pa.Table.from_pandas(df)
@@ -49,6 +48,13 @@ class ScraperRunner:
     def _dt_to_year_half_str(self, dt):
         return 'H%dY%d' % (1 + ((dt.month - 1) // 6), dt.year)
 
+    def _increment_file(self, current_page):
+        """
+        Returns a new file name based on the last DrudgePage of the old
+        filename.
+        """
+        return self._dt_to_year_half_str(current_page.dt + datetime.timedelta(days=1))
+
     def _next_page_is_new_file(self, page, filename):
         return self._dt_to_year_half_str(page.dt + datetime.timedelta(days=1)) != filename
 
@@ -80,7 +86,7 @@ class ScraperRunner:
 
                 # reset list of links and expected filename
                 current_links = []
-                self.current_file = self._dt_to_year_half_str(page.dt)
+                self.current_file = self._increment_file(page)
             else:
                 current_links.extend(page_links)
                 print(len(current_links))
@@ -88,8 +94,8 @@ class ScraperRunner:
 
 if __name__ == "__main__":
 
-    start_date = datetime.datetime(2001, 11, 18)
-    end_date = datetime.datetime(2003, 1, 1)
+    start_date = datetime.datetime(2002, 9, 18)
+    end_date = datetime.datetime(2002, 9, 25)
    
     runner = ScraperRunner()
     runner.run(start_date=start_date, end_date=end_date)
