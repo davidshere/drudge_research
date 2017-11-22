@@ -17,6 +17,7 @@ NEW_HTML_BEGINS = datetime.datetime(2009, 10, 6, 5, 57, 42)
 class ParseError(Exception):
   pass
 
+
 # going back to mid-2009
 def recent_top_splash_finder(soup):
   top = soup.find('div', {'id': 'drudgeTopHeadlines'})
@@ -25,6 +26,7 @@ def recent_top_splash_finder(soup):
   top = top.find_all('a')
   splash = top.pop()
   return {'top': top, 'splash': splash}
+
 
 # before mid-2009
 def find_splash_with_font_size(soup):
@@ -46,6 +48,7 @@ def find_splash_with_font_size(soup):
   link = font_size_element.next.find('a')
   if link != -1:
     return link
+
 
 def is_logo_link(element):
   contents = element.contents
@@ -78,12 +81,14 @@ def get_early_top(links, found_splash):
       return top_links
     top_links.append(links[j])
 
+
 # starting at the beginning to mid 2009
 def early_top_splash_finder(soup):
   splash = find_splash_with_font_size(soup)
   links = soup.find_all('a')
   top = get_early_top(links, splash) or []
   return {'top': top, 'splash': splash}
+
 
 def parse_main_and_splash(soup, page_dt):
   if page_dt >= NEW_HTML_BEGINS:

@@ -8,6 +8,7 @@ import time
 from aiohttp import ClientSession, ClientError
 from bs4 import BeautifulSoup
 import requests
+import backoff
 
 from parse_main_and_splash import parse_main_and_splash
 
@@ -27,9 +28,9 @@ DrudgeLink = collections.namedtuple("DrudgeLink", [
 
 # Set up logging. This can't be the best way...
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.INFO)
+logger.setLevel(logging.WARN)
 ch = logging.StreamHandler()
-ch.setLevel(logging.INFO)
+ch.setLevel(logging.WARN)
 formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 ch.setFormatter(formatter)
 logger.addHandler(ch)
@@ -187,12 +188,13 @@ class DayPage(object):
     async def _fetch_drudge_page(self, page, sem, session):
         logger.info("Fetching drudge page at %s", page.url)
 
-        async with sem, session.get(page.url) as response:
+        async with sem, session.get(page.url, timeout=30) as response:
             response = await asyncio.gather(response.read())
 
         page.html = response[0]
         self._task_queue.put(page)
 
+    @backoff.on_exception(backoff.expo, ClientError, max_tries=8)
     async def _generate_fetch_tasks(self, page_limit):
         tasks = []
         sem = asyncio.Semaphore(SEMAPHORE_COUNT)
@@ -278,7 +280,7 @@ if __name__ == "__main__":
     x = time.time()
     start = datetime.datetime.now()
     dt = datetime.date.today() - datetime.timedelta(days=30)
-    dt = datetime.datetime(2002, 9, 21)
+    dt = datetime.datetime(2003, 8, 26)
 
     dp = DayPage(dt)
     d = dp.process_day()
