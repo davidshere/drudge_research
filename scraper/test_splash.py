@@ -1,6 +1,8 @@
 import datetime
 import unittest
 
+from bs4 import BeautifulSoup
+
 from parse_main_and_splash import *
 
 EARLY_DT = datetime.datetime(2001, 11, 19, 0, 0)
@@ -172,6 +174,12 @@ EXPECTED_RESULTS = {
       'Islamic immigration to USA on rise... ',
       "Britain's MI5 warns al Qaeda planning mass attacks on West..."
     ]
+  },
+  0.5: {
+    'splash': None,
+    'top': [
+      "Gen. Wesley Clark: 'White House tried to get me knocked off CNN'..."
+    ]
   }
 }
 
@@ -183,7 +191,7 @@ def top_splash_to_text(top_and_splash):
   return top_and_splash
 
 def load_resource(page_number):
-  with open('test/resources/test_file_%d.html' % page_number, 'r') as f:
+  with open('test/resources/test_file_{}.html'.format(page_number), 'r') as f:
     html = f.read()
   return BeautifulSoup(html, 'lxml') 
 

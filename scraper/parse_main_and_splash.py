@@ -52,14 +52,18 @@ def find_splash_with_font_size(soup):
 
 def is_logo_link(element):
   contents = element.contents
-  try:
-    is_right_length = len(contents) == 1
-    is_tag = isinstance(contents[0], Tag)
-    is_right_filename = contents[0].get('src').split('/')[-1] == LOGO_FILENAME
-
-    return is_right_length and is_tag and is_right_filename
-  except AttributeError:
+  if len(contents) != 1:
     return False
+
+  tag = contents[0]
+  if not isinstance(tag, Tag):
+    return False
+
+  src = tag.get('src')
+  if not src:
+    return False
+
+  return src.split('/')[-1] == LOGO_FILENAME
 
 
 def get_early_top(links, found_splash):
@@ -67,9 +71,9 @@ def get_early_top(links, found_splash):
 
   # find the index of the element found_splash in
   # the list of links
-  try:
+  if found_splash:
     splash_index = links.index(found_splash)
-  except ValueError:
+  else:
     for link in links:
       if is_logo_link(link):
         splash_index = links.index(link)
@@ -79,7 +83,9 @@ def get_early_top(links, found_splash):
     parsed_url = urllib.parse.urlparse(links[j].get('href')).netloc.lower()
     if parsed_url in STOP_DOMAINS:
       return top_links
-    top_links.append(links[j])
+
+    if links[j].text:
+      top_links.append(links[j])
 
 
 # starting at the beginning to mid 2009
