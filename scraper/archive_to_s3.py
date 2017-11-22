@@ -12,8 +12,9 @@ from models import DayPage, logger
 BUCKET_NAME = 'drudge-archive'
 S3_LOCATION_FMT = 'data/{yearhalf}.parquet'
 
-START_DATE = datetime.date(2001, 11, 18)
-END_DATE = datetime.date.today()
+START_DATE = datetime.datetime(2001, 11, 18, 0, 0)
+END_DATE = datetime.datetime.combine(datetime.date.today(), datetime.time())
+
 
 def structured_links_to_s3(links, fname, logger=None):
     logger.info("Beginning transform of links to parquet and posting to S3 for %s", fname)
@@ -32,14 +33,17 @@ def structured_links_to_s3(links, fname, logger=None):
 
     return success
 
+
 def structured_links_to_disk(links, fname, logger=None):
     df = pd.DataFrame(links)
     df.to_csv(fname)
+
 
 def day_pages(start=START_DATE, end=datetime.date.today()):
     date_generator = (start + datetime.timedelta(days) for days in range((end-start).days))
     for dt in date_generator:
         yield DayPage(dt)
+
 
 class ScraperRunner:
     def __init__(self, output_fn=structured_links_to_s3):
@@ -88,8 +92,8 @@ class ScraperRunner:
 
 if __name__ == "__main__":
 
-    start_date = datetime.datetime(2003, 1, 1)
-    end_date = datetime.datetime(2005, 1, 1)
+    start_date = datetime.datetime(2005, 1, 1)
+    end_date = datetime.datetime(2017, 1, 1)
    
     runner = ScraperRunner()
     runner.run(start_date=start_date, end_date=end_date)

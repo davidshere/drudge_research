@@ -180,6 +180,14 @@ EXPECTED_RESULTS = {
     'top': [
       "Gen. Wesley Clark: 'White House tried to get me knocked off CNN'..."
     ]
+  },
+  1.5: {
+    'splash': 'WHAT WILL IT BE?',
+    'top': [
+      'Murdoch rebuffs level of DOW JONES family support...',
+      'Down to the Wire... '
+    ],
+    'raises': ParseError
   }
 }
 
@@ -204,9 +212,15 @@ class TopAndSplashTest(unittest.TestCase):
       file_dt = EARLY_DT if file_number <= 14 else LATE_DT
 
       soup = load_resource(file_number)
-      top_and_splash = top_splash_to_text(parse_main_and_splash(soup, file_dt))
 
-      self.assertEqual(EXPECTED_RESULTS[file_number], top_and_splash)
+      expected_result = EXPECTED_RESULTS[file_number]
+      if 'raises' in expected_result.keys():
+        with self.assertRaises(expected_result['raises']):
+          top_splash_to_text(parse_main_and_splash(soup, file_dt))
+      else:
+        top_and_splash = top_splash_to_text(parse_main_and_splash(soup, file_dt))
+        self.assertEqual(expected_result, top_and_splash)
+
 
 if __name__ == "__main__":
   unittest.main()

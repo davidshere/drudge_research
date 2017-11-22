@@ -74,10 +74,12 @@ def get_early_top(links, found_splash):
   if found_splash and found_splash in links:
     splash_index = links.index(found_splash)
   else:
-    for link in links:
+    for index, link in enumerate(links):
       if is_logo_link(link):
-        splash_index = links.index(link)
+        splash_index = index
         break
+    else:
+      raise ParseError("splash_index not found")
 
   for j in range(splash_index-1, 0, -1):
     parsed_url = urllib.parse.urlparse(links[j].get('href')).netloc.lower()

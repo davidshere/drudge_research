@@ -10,7 +10,7 @@ from bs4 import BeautifulSoup
 import requests
 import backoff
 
-from parse_main_and_splash import parse_main_and_splash
+from parse_main_and_splash import parse_main_and_splash, ParseError
 
 DAY_PAGE_FMT_URL = "http://www.drudgereportarchives.com/data/%s/%02d/%02d/index.htm?s=flag"
 MIN_START_DATE = datetime.date(2001, 11, 18)
@@ -55,23 +55,37 @@ class DrudgePage(object):
             return DrudgeLink(self.page_dt, url, link.text, top, splash)
 
     def drudge_page_to_links(self):
-        ''' scrape takes a url to an individual drudge page, and 
-            scrapes every link.  '''
+        '''
+        Takes a url to an individual drudge page and transforms it to a list
+        of DrudgeLink namedtuples. In the event of a ParseError, tries to use
+        `html.parser` instead of `lxml`.
+        '''
         processed_links = []
         if hasattr(self, 'html') and self._page_has_content(self.html):
-            soup = BeautifulSoup(self.html, 'lxml')
-            all_links = soup.find_all('a')
+            try:
+                soup = BeautifulSoup(self.html, 'lxml')
+                all_links = soup.find_all('a')
 
-            # a basically blank page with a drudge logo will
-            # still get past our _page_has_content filter
-            #
-            # an empty page, as far as I've seen, has 16 total links
-            # on the archive. So, as a last resort, we'll make sure
-            # we have at least that many links
-            if len(all_links) <= 16:
-                return []
+                # a basically blank page with a drudge logo will
+                # still get past our _page_has_content filter
+                #
+                # an empty page, as far as I've seen, has 16 total links
+                # on the archive. So, as a last resort, we'll make sure
+                # we have at least that many links
+                if len(all_links) <= 16:
+                    return []
 
-            main_links = parse_main_and_splash(soup, self.page_dt)
+                main_links = parse_main_and_splash(soup, self.page_dt)
+            except ParseError as e:
+                logger.debug("Failed to parse {} using lxml, trying `html.parser`".format(self.page_dt))
+                soup = BeautifulSoup(self.html, 'html.parser')
+                all_links = soup.find_all('a')
+
+                if len(all_links) <= 16:
+                    return []
+
+                main_links = parse_main_and_splash(soup, self.page_dt)
+
             for link in all_links:
                 processed_link = self.process_raw_link(link, main_links) 
                 if processed_link:
