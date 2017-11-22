@@ -71,7 +71,7 @@ def get_early_top(links, found_splash):
 
   # find the index of the element found_splash in
   # the list of links
-  if found_splash:
+  if found_splash and found_splash in links:
     splash_index = links.index(found_splash)
   else:
     for link in links:
