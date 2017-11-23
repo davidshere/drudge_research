@@ -19,7 +19,7 @@ SEMAPHORE_COUNT = 5
 PROCESS_COUNT = multiprocessing.cpu_count()
 
 # Set up logging. This can't be the best way...
-LOG_LEVEL = logging.DEBUG
+LOG_LEVEL = logging.WARN
 logger = logging.getLogger(__name__)
 logger.setLevel(LOG_LEVEL)
 ch = logging.StreamHandler()

@@ -95,7 +95,6 @@ def early_top_splash_finder(soup, page_dt):
   return {'top': top, 'splash': splash}
 
 
-
 # going back to mid-2009
 def recent_top_splash_finder(soup):
   drudge_top_headlines = soup.find('div', {'id': 'drudgeTopHeadlines'})
