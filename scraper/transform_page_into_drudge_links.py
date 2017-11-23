@@ -95,14 +95,17 @@ def early_top_splash_finder(soup, page_dt):
   return {'top': top, 'splash': splash}
 
 
+
 # going back to mid-2009
 def recent_top_splash_finder(soup):
-  top = soup.find('div', {'id': 'drudgeTopHeadlines'})
-  if not top:
+  drudge_top_headlines = soup.find('div', {'id': 'drudgeTopHeadlines'})
+  if not drudge_top_headlines:
     raise ParseError("id: 'drudgeTopHeadlines' not found")
-  top = top.find_all('a')
-  splash = top.pop()
-  return {'top': top, 'splash': splash}
+
+  top_links = drudge_top_headlines.find_all('a') or []
+  splash = top_links.pop() if top_links else None
+
+  return {'top': top_links, 'splash': splash}
 
 
 def process_raw_link(link, page_main_links, page_dt):
