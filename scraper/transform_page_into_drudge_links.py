@@ -25,10 +25,6 @@ DrudgeLink = collections.namedtuple("DrudgeLink", [
 class ParseError(Exception):
   pass
 
-
-class MissingDrudgePageError(Exception):
-  pass
-
 # before mid-2009
 def find_splash_with_font_size(soup):
   """ Takes soup and returns the <a> element representing
@@ -67,7 +63,7 @@ def is_logo_link(element):
   return src.split('/')[-1] == LOGO_FILENAME
 
 
-def get_early_top(links, found_splash):
+def get_early_top(links, found_splash, page_dt):
   top_links = []
 
   # find the index of the element found_splash in
@@ -80,7 +76,7 @@ def get_early_top(links, found_splash):
         splash_index = index
         break
     else:
-      raise ParseError("splash_index not found")
+      raise ParseError("Couldn't parse metadata for {}, HTML likely malformed.".format(page_dt))
 
   for j in range(splash_index-1, 0, -1):
     parsed_url = urllib.parse.urlparse(links[j].get('href')).netloc.lower()
@@ -92,10 +88,10 @@ def get_early_top(links, found_splash):
 
 
 # starting at the beginning to mid 2009
-def early_top_splash_finder(soup):
+def early_top_splash_finder(soup, page_dt):
   splash = find_splash_with_font_size(soup)
   links = soup.find_all('a')
-  top = get_early_top(links, splash) or []
+  top = get_early_top(links, splash, page_dt) or []
   return {'top': top, 'splash': splash}
 
 
@@ -124,7 +120,7 @@ def parse_main_and_splash(soup, page_dt):
   if page_dt >= NEW_HTML_BEGINS:
     return recent_top_splash_finder(soup)
   else:
-    return early_top_splash_finder(soup)
+    return early_top_splash_finder(soup, page_dt)
 
 def transform_page_into_drudge_links(soup, page_dt):
   """ Main transformation method. """
@@ -133,7 +129,7 @@ def transform_page_into_drudge_links(soup, page_dt):
   # if there are fewer than 16 links on the page
   # it was likely an error of some kind
   if len(all_links) <= 16:
-    raise MissingDrudgePageError
+    raise ParseError("Not enough links on archive page for {}".format(page_dt))
 
   metadata = parse_main_and_splash(soup, page_dt)
 

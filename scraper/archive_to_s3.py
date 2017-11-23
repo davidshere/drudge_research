@@ -92,8 +92,7 @@ class ScraperRunner:
 
 if __name__ == "__main__":
 
-    start_date = datetime.datetime(2005, 1, 1)
-    end_date = datetime.datetime(2017, 1, 1)
+    start_date = datetime.datetime(2009, 1, 1)
    
     runner = ScraperRunner()
-    runner.run(start_date=start_date, end_date=end_date)
+    runner.run(start_date=start_date)

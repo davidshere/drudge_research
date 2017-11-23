@@ -51,9 +51,8 @@ class DrudgePage(object):
                 soup = BeautifulSoup(self.html, 'lxml')
                 drudge_links = transform_page_into_drudge_links(soup, self.page_dt)
             except ParseError as e:
-                logger.debug("Failed to parse {} using lxml, trying `html.parser`".format(self.page_dt))
-                soup = BeautifulSoup(self.html, 'html.parser')
-                drudge_links = transform_page_into_drudge_links(soup, self.page_dt)
+                logger.debug("Failed to parse {} using lxml.".format(self.page_dt))
+                drudge_links = []
 
         logger.info("Done processing %d links for %s", len(drudge_links), self.page_dt)
         return drudge_links
@@ -257,7 +256,7 @@ if __name__ == "__main__":
     x = time.time()
     start = datetime.datetime.now()
     dt = datetime.date.today() - datetime.timedelta(days=30)
-    dt = datetime.datetime(2003, 8, 26)
+    dt = datetime.datetime(2009, 2, 20)
 
     dp = DayPage(dt)
     d = dp.process_day()
