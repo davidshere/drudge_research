@@ -1,6 +1,6 @@
 import datetime
 
-from models import DrudgeLink
+from transform_page_into_drudge_links import DrudgeLink
 
 expected_results = [
 	DrudgeLink(page_dt=datetime.datetime(2007, 7, 30, 0, 0), url='http://www.drudgereportArchives.com/index.htm', hed='DrudgeReportArchives.com', is_top=False, is_splash=False),

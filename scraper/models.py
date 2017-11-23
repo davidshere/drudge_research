@@ -10,21 +10,13 @@ from bs4 import BeautifulSoup
 import requests
 import backoff
 
-from parse_main_and_splash import parse_main_and_splash, ParseError
+from transform_page_into_drudge_links import transform_page_into_drudge_links, ParseError
 
 DAY_PAGE_FMT_URL = "http://www.drudgereportarchives.com/data/%s/%02d/%02d/index.htm?s=flag"
 MIN_START_DATE = datetime.date(2001, 11, 18)
 
 SEMAPHORE_COUNT = 5
 PROCESS_COUNT = multiprocessing.cpu_count()
-
-DrudgeLink = collections.namedtuple("DrudgeLink", [
-    'page_dt',
-    'url',
-    'hed',
-    'is_top',
-    'is_splash'
-])
 
 # Set up logging. This can't be the best way...
 logger = logging.getLogger(__name__)
@@ -45,55 +37,26 @@ class DrudgePage(object):
         self.url = url
         self.page_dt = page_dt
 
-    def process_raw_link(self, link, page_main_links):
-        url = link.get('href')
-        if url:
-            # determine if the link is in the top or the splash
-            splash = link == page_main_links['splash']
-            top = link in page_main_links['top']
-
-            return DrudgeLink(self.page_dt, url, link.text, top, splash)
-
     def drudge_page_to_links(self):
         '''
         Takes a url to an individual drudge page and transforms it to a list
         of DrudgeLink namedtuples. In the event of a ParseError, tries to use
         `html.parser` instead of `lxml`.
         '''
-        processed_links = []
-        if hasattr(self, 'html') and self._page_has_content(self.html):
+        if not hasattr(self, 'html'):
+            raise Exception("Can't process DrudgePage without the html!")
+
+        if self._page_has_content(self.html):
             try:
                 soup = BeautifulSoup(self.html, 'lxml')
-                all_links = soup.find_all('a')
-
-                # a basically blank page with a drudge logo will
-                # still get past our _page_has_content filter
-                #
-                # an empty page, as far as I've seen, has 16 total links
-                # on the archive. So, as a last resort, we'll make sure
-                # we have at least that many links
-                if len(all_links) <= 16:
-                    return []
-
-                main_links = parse_main_and_splash(soup, self.page_dt)
+                drudge_links = transform_page_into_drudge_links(soup, self.page_dt)
             except ParseError as e:
                 logger.debug("Failed to parse {} using lxml, trying `html.parser`".format(self.page_dt))
                 soup = BeautifulSoup(self.html, 'html.parser')
-                all_links = soup.find_all('a')
+                drudge_links = transform_page_into_drudge_links(soup, self.page_dt)
 
-                if len(all_links) <= 16:
-                    return []
-
-                main_links = parse_main_and_splash(soup, self.page_dt)
-
-            for link in all_links:
-                processed_link = self.process_raw_link(link, main_links) 
-                if processed_link:
-                    processed_links.append(processed_link)
-
-
-        logger.info("Done processing %d links for %s", len(processed_links), self.page_dt)
-        return processed_links
+        logger.info("Done processing %d links for %s", len(drudge_links), self.page_dt)
+        return drudge_links
 
     def _page_has_content(self, html):
         """ Returns true if a drudge page has actual content. """

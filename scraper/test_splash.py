@@ -3,7 +3,7 @@ import unittest
 
 from bs4 import BeautifulSoup
 
-from parse_main_and_splash import *
+from transform_page_into_drudge_links import *
 
 EARLY_DT = datetime.datetime(2001, 11, 19, 0, 0)
 LATE_DT = datetime.datetime(2017, 1, 1, 0, 0)
@@ -192,6 +192,7 @@ EXPECTED_RESULTS = {
 }
 
 def top_splash_to_text(top_and_splash):
+  # don't want to test this
   if top_and_splash['splash']:
     top_and_splash['splash'] = top_and_splash['splash'].text
   if top_and_splash['top']:
@@ -219,6 +220,8 @@ class TopAndSplashTest(unittest.TestCase):
           top_splash_to_text(parse_main_and_splash(soup, file_dt))
       else:
         top_and_splash = top_splash_to_text(parse_main_and_splash(soup, file_dt))
+
+        # don't want to test this
         self.assertEqual(expected_result, top_and_splash)
 
 

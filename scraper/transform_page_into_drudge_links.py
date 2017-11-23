@@ -1,3 +1,4 @@
+import collections
 import datetime
 
 from bs4 import BeautifulSoup, Tag
@@ -13,20 +14,20 @@ LOGO_FILENAME = 'logo9.gif'
 
 NEW_HTML_BEGINS = datetime.datetime(2009, 10, 6, 5, 57, 42)
 
+DrudgeLink = collections.namedtuple("DrudgeLink", [
+    'page_dt',
+    'url',
+    'hed',
+    'is_top',
+    'is_splash'
+])
 
 class ParseError(Exception):
   pass
 
 
-# going back to mid-2009
-def recent_top_splash_finder(soup):
-  top = soup.find('div', {'id': 'drudgeTopHeadlines'})
-  if not top:
-    raise ParseError("id: 'drudgeTopHeadlines' not found")
-  top = top.find_all('a')
-  splash = top.pop()
-  return {'top': top, 'splash': splash}
-
+class MissingDrudgePageError(Exception):
+  pass
 
 # before mid-2009
 def find_splash_with_font_size(soup):
@@ -98,8 +99,51 @@ def early_top_splash_finder(soup):
   return {'top': top, 'splash': splash}
 
 
+# going back to mid-2009
+def recent_top_splash_finder(soup):
+  top = soup.find('div', {'id': 'drudgeTopHeadlines'})
+  if not top:
+    raise ParseError("id: 'drudgeTopHeadlines' not found")
+  top = top.find_all('a')
+  splash = top.pop()
+  return {'top': top, 'splash': splash}
+
+
+def process_raw_link(link, page_main_links, page_dt):
+  url = link.get('href')
+  if url:
+    # determine if the link is in the top or the splash
+    splash = link == page_main_links['splash']
+    top = link in page_main_links['top']
+
+    return DrudgeLink(page_dt, url, link.text, top, splash)
+
 def parse_main_and_splash(soup, page_dt):
+  # we've got different parsing methods for earlier and later iterations
+  # of the drudge report
   if page_dt >= NEW_HTML_BEGINS:
     return recent_top_splash_finder(soup)
   else:
     return early_top_splash_finder(soup)
+
+def transform_page_into_drudge_links(soup, page_dt):
+  """ Main transformation method. """
+  all_links = soup.find_all('a')
+
+  # if there are fewer than 16 links on the page
+  # it was likely an error of some kind
+  if len(all_links) <= 16:
+    raise MissingDrudgePageError
+
+  metadata = parse_main_and_splash(soup, page_dt)
+
+  # We need to loop through the links and create DrudgeLink objects.
+  processed_links = []
+  for link in all_links:
+
+    drudge_link = process_raw_link(link, metadata, page_dt)
+
+    if drudge_link:
+      processed_links.append(drudge_link)
+
+  return processed_links
