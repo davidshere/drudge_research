@@ -20,9 +20,9 @@ PROCESS_COUNT = multiprocessing.cpu_count()
 
 # Set up logging. This can't be the best way...
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.WARN)
+logger.setLevel(logging.DEBUG)
 ch = logging.StreamHandler()
-ch.setLevel(logging.WARN)
+ch.setLevel(logging.DEBUG)
 formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 ch.setFormatter(formatter)
 logger.addHandler(ch)
@@ -46,15 +46,19 @@ class DrudgePage(object):
         if not hasattr(self, 'html'):
             raise Exception("Can't process DrudgePage without the html!")
 
-        if self._page_has_content(self.html):
-            try:
-                soup = BeautifulSoup(self.html, 'lxml')
-                drudge_links = transform_page_into_drudge_links(soup, self.page_dt)
-            except ParseError as e:
-                logger.debug("Failed to parse {} using lxml.".format(self.page_dt))
-                drudge_links = []
 
-        logger.info("Done processing %d links for %s", len(drudge_links), self.page_dt)
+        if not self._page_has_content(self.html):
+            logger.info("Drudge Page for {} had no content".format(self.page_dt))
+            return []
+
+        try:
+            soup = BeautifulSoup(self.html, 'lxml')
+            drudge_links = transform_page_into_drudge_links(soup, self.page_dt)
+            logger.info("Done processing %d links for %s", len(drudge_links), self.page_dt)
+        except ParseError as e:
+            logger.debug("Failed to parse {} using lxml.".format(self.page_dt))
+            drudge_links = []
+
         return drudge_links
 
     def _page_has_content(self, html):
@@ -256,7 +260,7 @@ if __name__ == "__main__":
     x = time.time()
     start = datetime.datetime.now()
     dt = datetime.date.today() - datetime.timedelta(days=30)
-    dt = datetime.datetime(2009, 2, 20)
+    dt = datetime.datetime(2009, 4, 2)
 
     dp = DayPage(dt)
     d = dp.process_day()
