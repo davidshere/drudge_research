@@ -19,10 +19,11 @@ SEMAPHORE_COUNT = 5
 PROCESS_COUNT = multiprocessing.cpu_count()
 
 # Set up logging. This can't be the best way...
+LOG_LEVEL = logging.DEBUG
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG)
+logger.setLevel(LOG_LEVEL)
 ch = logging.StreamHandler()
-ch.setLevel(logging.DEBUG)
+ch.setLevel(LOG_LEVEL)
 formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 ch.setFormatter(formatter)
 logger.addHandler(ch)
@@ -46,9 +47,8 @@ class DrudgePage(object):
         if not hasattr(self, 'html'):
             raise Exception("Can't process DrudgePage without the html!")
 
-
         if not self._page_has_content(self.html):
-            logger.info("Drudge Page for {} had no content".format(self.page_dt))
+            logger.warn("Drudge Page for {} had no content".format(self.page_dt))
             return []
 
         try:
@@ -56,7 +56,7 @@ class DrudgePage(object):
             drudge_links = transform_page_into_drudge_links(soup, self.page_dt)
             logger.info("Done processing %d links for %s", len(drudge_links), self.page_dt)
         except ParseError as e:
-            logger.debug("Failed to parse {} using lxml.".format(self.page_dt))
+            logger.warn("Failed to parse {} using lxml.".format(self.page_dt))
             drudge_links = []
 
         return drudge_links
@@ -260,7 +260,7 @@ if __name__ == "__main__":
     x = time.time()
     start = datetime.datetime.now()
     dt = datetime.date.today() - datetime.timedelta(days=30)
-    dt = datetime.datetime(2009, 4, 2)
+    dt = datetime.datetime(2009, 10, 17)
 
     dp = DayPage(dt)
     d = dp.process_day()
