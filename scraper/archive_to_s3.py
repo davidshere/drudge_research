@@ -44,23 +44,22 @@ def day_pages(start=START_DATE, end=datetime.date.today()):
     for dt in date_generator:
         yield DayPage(dt)
 
+def dt_to_year_half_str(dt):
+    return 'H%dY%d' % (1 + ((dt.month - 1) // 6), dt.year)
 
 class ScraperRunner:
     def __init__(self, output_fn=structured_links_to_s3):
         self.output_fn = output_fn
-
-    def _dt_to_year_half_str(self, dt):
-        return 'H%dY%d' % (1 + ((dt.month - 1) // 6), dt.year)
 
     def _increment_file(self, current_page):
         """
         Returns a new file name based on the last DrudgePage of the old
         filename.
         """
-        return self._dt_to_year_half_str(current_page.dt + datetime.timedelta(days=1))
+        return dt_to_year_half_str(current_page.dt + datetime.timedelta(days=1))
 
     def _next_page_is_new_file(self, page, filename):
-        return self._dt_to_year_half_str(page.dt + datetime.timedelta(days=1)) != filename
+        return dt_to_year_half_str(page.dt + datetime.timedelta(days=1)) != filename
 
     def _next_page_is_end_date(self, page):
         return page.dt + datetime.timedelta(days=1) == self.end_date
@@ -71,7 +70,7 @@ class ScraperRunner:
     def run(self, start_date=START_DATE, end_date=END_DATE, page_limit=None):
         self.start_date = start_date
         self.end_date = end_date
-        self.current_file = self._dt_to_year_half_str(start_date)
+        self.current_file = dt_to_year_half_str(start_date)
 
         current_links = []
 
