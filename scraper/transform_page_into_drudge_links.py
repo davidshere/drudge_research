@@ -63,11 +63,8 @@ def is_logo_link(element):
   return src.split('/')[-1] == LOGO_FILENAME
 
 
-def get_early_top(links, found_splash, page_dt):
-  top_links = []
-
-  # find the index of the element found_splash in
-  # the list of links
+def index_for_splash_element_in_list_of_liks(found_splash, links):
+  """ Find the index of the element found_splash in the list of links. """
   if found_splash and found_splash in links:
     splash_index = links.index(found_splash)
   else:
@@ -78,13 +75,20 @@ def get_early_top(links, found_splash, page_dt):
     else:
       raise ParseError("Couldn't parse metadata for {}, HTML likely malformed.".format(page_dt))
 
-  for j in range(splash_index-1, 0, -1):
-    parsed_url = urllib.parse.urlparse(links[j].get('href')).netloc.lower()
-    if parsed_url in STOP_DOMAINS:
+
+def get_early_top(links, found_splash, page_dt):
+  top_links = []
+
+  splash_index = index_for_splash_element_in_list_of_liks(found_splash, links)
+
+  for link in links[splash_index-1 : 0 : -1]:
+    href_netloc = urllib.parse.urlparse(link.get('href')).netloc.lower()
+    if href_netloc in STOP_DOMAINS:
       return top_links
 
-    if links[j].text:
-      top_links.append(links[j])
+    if link.text:
+      top_links.append(link)
+  raise ParseError("get_early_top returned None - it shouldn't do that")
 
 
 # starting at the beginning to mid 2009
