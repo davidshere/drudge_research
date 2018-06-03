@@ -66,21 +66,30 @@ Vagrant.configure("2") do |config|
   config.vm.provision "shell", inline: <<-SHELL
     set -euxo pipefail
 
+    VAGRANT_HOME=/home/vagrant
+
     sudo apt-get update
     sudo apt-get install -y \
       default-jdk \
       scala \
       git
 
-    # download and link up spark
+    # download and install spark
     SPARK_VERSION=spark-2.3.0
     SPARK_TARBALL_FILENAME=$SPARK_VERSION-bin-hadoop2.7.tgz
     DOWNLOAD_URL=http://www-eu.apache.org/dist/spark/$SPARK_VERSION/$SPARK_TARBALL_FILENAME
  
-    curl -SO $DOWNLOAD_URL 
-    tar xvf $SPARK_TARBALL_FILENAME
+    if [[ ! -d /usr/local/spark ]]; then
+      curl -SO $DOWNLOAD_URL
+      tar xvf $SPARK_TARBALL_FILENAME
+      rm $SPARK_TARBALL_FILENAME
 
-    #pushd $(echo $SPARK_TARBALL_FILENAME | sed -e 's/\.tgz//g')
+      SPARK_DIR=$(echo $SPARK_TARBALL_FILENAME | sed -e 's/\.tgz//g')
+      mkdir /usr/local/spark
+      mv $SPARK_DIR/* /usr/local/spark/
+      rm -rf $SPARK_DIR
+    fi
 
+    echo "export PATH=$PATH:/usr/local/spark/bin" >> $VAGRANT_HOME/.bashrc
    SHELL
 end
