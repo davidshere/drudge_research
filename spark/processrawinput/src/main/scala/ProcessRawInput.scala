@@ -2,12 +2,13 @@
 package processrawinput
 
 import java.net.URL
+import java.util.UUID
 
 import org.apache.spark.sql.SparkSession
-import org.apache.spark.sql.Dataset
+import org.apache.spark.sql.{ Dataset, DataFrame }
 import org.apache.spark.sql.functions._
 
-import processrawinput.DrudgeLink._
+import DrudgeLink._
 
 object ProcessRawInput {
 
@@ -27,12 +28,63 @@ object ProcessRawInput {
   def toDrudgeOrArchiveLinkBool = 
     udf[Boolean, String](isDrudgeOrArchiveLink(_))
 
+  def cleanUpURL(ds: Dataset[DrudgeLink]): DataFrame = {
+    // remove links with bad protocols
+    val dfNoBadProtocol = ds
+      .filter(r => ! r.url.startsWith("mailto:"))
+      .filter(r => ! r.url.startsWith("javascript"))
+      .filter(r => r.url != "<A HREF=")
 
-  def main(args: Array[String]) {
-   
-    val spark = SparkSession.builder.appName("ProcessRawInput").getOrCreate()
+    // clean up malformed URLs
+    val uriBadProtocolRegex = "^(hhttp|tp|p)://"
 
-    val inDf = spark.read.parquet("file:///home/david/transformed_data/H2Y2012.parquet")
+    val cleanedProtocol = dfNoBadProtocol
+      .withColumn("urlCleanProtocol",
+        regexp_replace(
+          ds("url"),
+          uriBadProtocolRegex,
+          "http://"))
+
+    val cleanUpCharacters = cleanedProtocol
+      .withColumn("trimmedUrl", trim(col("urlCleanProtocol")))
+
+    cleanUpCharacters
+      .drop("url")
+      .drop("urlCleanProtocol")
+      .withColumn("url", col("trimmedUrl"))
+      .drop("trimmedUrl")
+  }
+
+  def transformDataFrame(df: Dataset[DrudgeLink]): DataFrame = {
+
+    val dfCleanUrls = cleanUpURL(df)
+
+    val dfWithCols = dfCleanUrls
+      // parsing the url
+      .withColumn("host", toHost(col("url")))
+      .withColumn("isDrudgeUrl", toDrudgeOrArchiveLinkBool(col("host")))
+      // this is sort of a debugging column
+      .withColumn("badURL", col("host").startsWith("BAD URL"))
+      // transforming the page date time
+      .withColumn("pageDateTime", col("page_dt").cast("timestamp"))
+      .drop("page_dt")
+      // add a unique identifier for the unique drudge link
+      .withColumn("linkId", hash(concat(col("hed"), col("url"))))
+      .withColumn("linkInstanceId", monotonically_increasing_id)
+
+    //dfWithCols
+    //  .join(dfWithCols.groupBy("linkId").count(), "linkId")
+
+    // Need to classify link instances as long-term or short-term links
+    import processrawinput.LinkMetrics
+    val dfWithLinkTypes = LinkMetrics.clusterLinkTypes(dfWithCols)
+    //dfWithCols
+    dfWithLinkTypes.join(dfWithCols, "linkInstanceId")
+
+  }
+
+  def loadDrudgeLinks(filename: String, spark: SparkSession): Dataset[DrudgeLink] = {
+    val inDf = spark.read.parquet(s"file:///vagrant/${filename}.parquet")
 
     // drop __index_level_0__ column
     val COL_TO_DROP = "__index_level_0__"
@@ -40,35 +92,19 @@ object ProcessRawInput {
     val df = inDf.drop(COL_TO_DROP)
 
     import spark.implicits._
-    val ds: Dataset[DrudgeLink] = df.as[DrudgeLink]
-    
-    ds.show(5)
 
+    df.as[DrudgeLink]
+  }
 
-    // clean up malformed URLs
-    val uriBadProtocolRegex = "^(hhttp|tp)://"
-    val dsCleanURL = ds.withColumn("urlCleanProtocol",
-                           regexp_replace(
-                             ds("url"),
-                             uriBadProtocolRegex,
-                             "http://"))
+  def main(args: Array[String]) {
+   
+    val spark = SparkSession.builder.appName("ProcessRawInput").getOrCreate()
 
-    def dsClean = 
-      dsCleanURL
-        // parsing the url
-        .withColumn("host", toHost(col("urlCleanProtocol")))
-        .withColumn("isDrudgeUrl", toDrudgeOrArchiveLinkBool(col("host")))
-        .withColumn("badURL", col("host").startsWith("BAD URL"))     
-        // transforming the page date time 
-        .withColumn("pageDateTime", col("page_dt").cast("timestamp"))
-        .drop("page_dt")
+    val df = loadDrudgeLinks("H2Y2010", spark)
 
-    dsClean.show(5)
-    
-    dsClean
-      .filter("host = 'BAD URL'")
-      .select("url")
-      .show()
-    spark.stop()
+    val transformedDf = transformDataFrame(df)
+
+    transformedDf.show(5)
+
   }
 }
