@@ -1,8 +1,8 @@
 import datetime
 import io
+import multiprocessing as mp
 
 import boto3
-import dateutil
 import pandas as pd
 import pyarrow as pa
 import pyarrow.parquet as pq
@@ -19,7 +19,9 @@ END_DATE = datetime.datetime.combine(datetime.date.today(), datetime.time())
 def structured_links_to_s3(links, fname, logger=None):
     logger.info("Beginning transform of links to parquet and posting to S3 for %s", fname)
     df = pd.DataFrame(links)
-    arrow_table = pa.Table.from_pandas(df)
+
+    arrow_thread_count = mp.cpu_count()
+    arrow_table = pa.Table.from_pandas(df, preserve_index=False, nthreads=arrow_thread_count)
 
     buff = io.BytesIO()
     pq.write_table(arrow_table, buff, flavor='spark')
@@ -91,7 +93,5 @@ class ScraperRunner:
 
 if __name__ == "__main__":
 
-    start_date = datetime.datetime(2009, 7, 1)
-   
     runner = ScraperRunner()
-    runner.run(start_date=start_date)
+    runner.run()

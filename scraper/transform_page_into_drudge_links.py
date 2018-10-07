@@ -26,7 +26,7 @@ DrudgeLink = collections.namedtuple("DrudgeLink", [
 class ParseError(Exception):
   pass
 
-# before mid-2009
+
 def find_splash_with_font_size(soup):
   """ Takes soup and returns the <a> elements representing
       the page splash.
@@ -35,19 +35,20 @@ def find_splash_with_font_size(soup):
   """
   font_size_element = soup.find('font', {"size":"+7"})
   if not font_size_element:
-    return None
+    return set()
 
-  # if the HTML is malformed or the headline isn't a link, this will return None
   splash_links = font_size_element.find_all('a')
   if splash_links:
     return set(splash_links)
 
-  # returns -1 if it finds nothing
+  # if the HTML is malformed or the headline isn't a link,
+  # this line will return -1
   link = font_size_element.next.find('a')
   if link != -1:
     return set([link])
 
 
+# before mid-2009
 def is_logo_link(element):
   contents = element.contents
   if len(contents) != 1:
@@ -102,13 +103,12 @@ def get_early_top(links, found_splash, page_dt):
   raise ParseError("get_early_top returned None - it shouldn't do that")
 
 
-# starting at the beginning to mid 2009
 def early_top_splash_finder(soup, page_dt):
   splash = find_splash_with_font_size(soup)
   links = soup.find_all('a')
   top = get_early_top(links, splash, page_dt)
   return {
-    'top': top or set(),
+    'top': top,
     'splash': splash or set()
   }
 
@@ -153,6 +153,7 @@ def transform_page_into_drudge_links(soup, page_dt):
   # if there are fewer than 16 links on the page
   # it was likely an error of some kind
   if len(all_links) <= 16:
+    return []
     raise ParseError("Not enough links on archive page for {}".format(page_dt))
 
   metadata = parse_main_and_splash(soup, page_dt)

@@ -61,21 +61,15 @@ EXPECTED_RESULTS = {
   },
   9: {
     'splash': set(),
-    'top': {
-      'DRUDGE RADIO LIVE SUNDAY NIGHT 10 PM ET TO 1 AM... HEARD IN ALL 50 STATES...'
-    }
+    'top': {'DRUDGE RADIO LIVE SUNDAY NIGHT 10 PM ET TO 1 AM... HEARD IN ALL 50 STATES...'}
   },
   10: {
     'splash': {'STALEMATE'},
-    'top': {
-      'BIGGEST GOVERNMENT   EVER!  Fed revenue collections and spending  at all-time highs... MORE...'
-    }
+    'top': {'BIGGEST GOVERNMENT   EVER!  Fed revenue collections and spending  at all-time highs... MORE...'}
   },
   11: {
     'splash': {'TROUBLE IN THE CITI'},
-    'top': {
-      "CAN SHE BEAT THEM?  New poll shows Clinton trails top '08 Republicans..."
-    }
+    'top': {"CAN SHE BEAT THEM?  New poll shows Clinton trails top '08 Republicans..."}
   },
   12: {
     'splash': {'RUSSERT DEAD AT NBC'},
@@ -98,9 +92,7 @@ EXPECTED_RESULTS = {
   },
   14: {
     'splash': {'THE WAY IT USED TO BE'},
-    'top': {
-      'Taliban video shows captive US soldier...'
-    }
+    'top': {'Taliban video shows captive US soldier...'}
   },
   15: {
     'splash': {'SEAT ME'},
@@ -127,15 +119,11 @@ EXPECTED_RESULTS = {
   },
   18: {
     'splash': {'OBAMACARE HEADED FOR SUPREMES'},
-    'top': {
-      '$200K Per Job? Geithner Says White House  Plan Still Bargain...'
-    }
+    'top': {'$200K Per Job? Geithner Says White House  Plan Still Bargain...'}
   },
   19: {
     'splash': {'ROMNEY WARNS:  OBAMA COMING FOR GUNS'},
-    'top': {
-      'WHAT HAPPENS IN VEGAS, STAYS IN VEGAS:  GSA OFFICIAL TO THE FIFTH...'
-    }
+    'top': {'WHAT HAPPENS IN VEGAS, STAYS IN VEGAS:  GSA OFFICIAL TO THE FIFTH...'}
   },
   20: {
     'splash': {'THE MORNING AFTER'},
@@ -181,9 +169,7 @@ EXPECTED_RESULTS = {
   },
   0.5: {
     'splash': set(),
-    'top': {
-      "Gen. Wesley Clark: 'White House tried to get me knocked off CNN'..."
-    }
+    'top': {"Gen. Wesley Clark: 'White House tried to get me knocked off CNN'..."}
   },
   1.5: {
     'splash': {'WHAT WILL IT BE?'},
