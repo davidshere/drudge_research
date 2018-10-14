@@ -55,11 +55,18 @@ object ProcessRawInput {
       .drop("trimmedUrl")
   }
 
-  def transformDataFrame(df: Dataset[DrudgeLink]): DataFrame = {
+  def enrichTableWithBasicColumns(df: DataFrame): DataFrame = {
+    /*
+      Run some simple transformations on the input data. Specifically, we're adding:
 
-    val dfCleanUrls = cleanUpURL(df)
-
-    val dfWithCols = dfCleanUrls
+      host: UDF uses java.net.URL.getHost to parse the url into a hostname
+      isDrudgeUrl: UDF to run a regex looking for 'drudge' in the hostname
+      badURL: transform BAD URL from the input data (i know) to a boolean
+      pageDateTime: casting the text input to a timestamp
+      linkId: a hash of the unique key for a link
+      linkInstanceId: a unique index for each instance of a drudge link
+    */
+    df
       // parsing the url
       .withColumn("host", toHost(col("url")))
       .withColumn("isDrudgeUrl", toDrudgeOrArchiveLinkBool(col("host")))
@@ -71,9 +78,12 @@ object ProcessRawInput {
       // add a unique identifier for the unique drudge link
       .withColumn("linkId", hash(concat(col("hed"), col("url"))))
       .withColumn("linkInstanceId", monotonically_increasing_id)
+  }
 
-    //dfWithCols
-    //  .join(dfWithCols.groupBy("linkId").count(), "linkId")
+  def transformDataFrame(df: Dataset[DrudgeLink]): DataFrame = {
+
+    val dfCleanUrls = cleanUpURL(df)
+    val dfWithCols = enrichTableWithBasicColumns(dfCleanUrls)
 
     // Need to classify link instances as long-term or short-term links
     import processrawinput.LinkMetrics

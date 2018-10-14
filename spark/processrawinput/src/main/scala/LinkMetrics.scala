@@ -2,7 +2,7 @@ package processrawinput
 
 import org.apache.spark.sql.DataFrame
 
-import org.apache.spark.ml.feature.VectorAssembler
+import org.apache.spark.ml.feature.{ VectorAssembler, Normalizer }
 import org.apache.spark.ml.linalg.Vectors
 
 import org.apache.spark.ml.clustering.KMeans
@@ -18,7 +18,7 @@ object LinkMetrics {
     val linkIdCountsDf = df.groupBy("linkId").count()
     
     val inputWithFeatureColumns = df
-      .select("linkInstanceId", "linkId", "url")
+      .select("linkInstanceId", "linkId", "url", "hed")
       .join(linkIdCountsDf, "linkId")
       .withColumn("urlCharLength", length(col("url")))
       .withColumn("hedCharLength", length(col("hed")))
@@ -27,12 +27,30 @@ object LinkMetrics {
       .setInputCols(Array("count", "urlCharLength", "hedCharLength"))
       .setOutputCol("features")
 
-    val dfToTrain = assembler.transform(inputWithFeatureColumns)
+    val dfWithFeatureVector = assembler.transform(inputWithFeatureColumns)
 
-    dfToTrain
+    normalizeFeatures(dfWithFeatureVector)
+    
+  }
+
+  def normalizeFeatures(df: DataFrame): DataFrame = {
+    val normalizer = new Normalizer()
+	.setInputCol("feature")
+	.setOutputCol("normFeatures")
+	.setP(1.0)
+
+    normalizer
+      .transform(df)
+      .withColumnRenamed("normFeature", "features")
   }
 
   def cleanOutput(df: DataFrame): DataFrame = {
+    /*
+    Do a little post processing, dropping unnecessary columns and
+    using meaningful terms for the prediction model outputs. 
+
+
+    */
     df
       .drop("linkId")
       .drop("count")
