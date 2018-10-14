@@ -35,7 +35,7 @@ object LinkMetrics {
 
   def normalizeFeatures(df: DataFrame): DataFrame = {
     val normalizer = new Normalizer()
-	.setInputCol("feature")
+	.setInputCol("features")
 	.setOutputCol("normFeatures")
 	.setP(1.0)
 
@@ -49,7 +49,11 @@ object LinkMetrics {
     Do a little post processing, dropping unnecessary columns and
     using meaningful terms for the prediction model outputs. 
 
-
+    We're also going to filter out predicted long term values
+    that we are no are false based on a simple rule, which is that
+    long term values have only uppercase headlines. Ideally that'd
+    feed into the model but I'm not sure how to convey that informatino
+    to a k-means clustering algorithm
     */
     df
       .drop("linkId")
