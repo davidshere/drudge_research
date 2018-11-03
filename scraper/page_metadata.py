@@ -4,7 +4,7 @@ import datetime
 from bs4 import BeautifulSoup, Tag
 import urllib.parse
 
-from drudge_data_classes import DrudgeLink
+from drudge_data_classes import DrudgePageMetadata
 
 STOP_DOMAINS = [
   'harvest.adgardener.com',
@@ -29,7 +29,7 @@ def find_splash_with_font_size(soup):
   """
   font_size_element = soup.find('font', {"size":"+7"})
   if not font_size_element:
-    return set()
+    return None
 
   splash_links = font_size_element.find_all('a')
   if splash_links:
@@ -39,7 +39,9 @@ def find_splash_with_font_size(soup):
   # this line will return -1
   link = font_size_element.next.find('a')
   if link != -1:
-    return set([link])
+    print("here!", set([link]))
+  
+    return None 
 
 
 # before mid-2009
@@ -75,7 +77,7 @@ def index_for_splash_element_in_list_of_links(found_splash, links):
 
 
 def get_early_top(links, found_splash, page_dt):
-  found_splash = found_splash or set()
+  found_splash = found_splash 
   top_links = set()
 
   try:
@@ -90,9 +92,9 @@ def get_early_top(links, found_splash, page_dt):
   for link in links[splash_index-1 : 0 : -1]:
     href_netloc = urllib.parse.urlparse(link.get('href')).netloc.lower()
     if href_netloc in STOP_DOMAINS:
-      return top_links
+      return None 
 
-    if link.text and link not in found_splash:
+    if found_splash and link.text and link not in found_splash:
       top_links.add(link)
   raise ParseError("get_early_top returned None - it shouldn't do that")
 
@@ -101,14 +103,11 @@ def early_top_splash_finder(soup, page_dt):
   splash = find_splash_with_font_size(soup)
   links = soup.find_all('a')
   top = get_early_top(links, splash, page_dt)
-  return {
-    'top': top,
-    'splash': splash or set()
-  }
+  return DrudgePageMetadata(splash_set=splash, top_set=top)
 
 
 # going back to mid-2009
-def recent_top_splash_finder(soup):
+def recent_top_splash_finder(soup, _):
   drudge_top_headlines = soup.find('div', {'id': 'drudgeTopHeadlines'})
 
   if not drudge_top_headlines:
@@ -116,49 +115,18 @@ def recent_top_splash_finder(soup):
 
   splash = find_splash_with_font_size(drudge_top_headlines)
 
-  top_links = drudge_top_headlines.find_all('a') or []
-  top_links = set(top_links)
-  top_links = top_links.difference(splash)
+  top_links = drudge_top_headlines.find_all('a')
+  if top_links: 
+    top_links = set(top_links)
+    top_links = top_links.difference(splash)
 
-  return {'top': top_links, 'splash': splash}
+  return DrudgePageMetadata(splash_set=splash, top_set=top_links)
 
-
-def process_raw_link(link, page_main_links, page_dt):
-  url = link.get('href')
-  if url:
-    # determine if the link is in the top or the splash
-    splash = link == page_main_links['splash']
-    top = link in page_main_links['top']
-
-    return DrudgeLink(url, page_dt, link.text, top, splash)
 
 def parse_main_and_splash(soup, page_dt):
   # we've got different parsing methods for earlier and later iterations
   # of the drudge report
-  if page_dt >= NEW_HTML_BEGINS:
-    return recent_top_splash_finder(soup)
-  else:
-    return early_top_splash_finder(soup, page_dt)
+  metadata_parser = recent_top_splash_finder if page_dt >= NEW_HTML_BEGINS else early_top_splash_finder
+  metadata = metadata_parser(soup, page_dt)
+  return metadata 
 
-def transform_page_into_drudge_links(soup, page_dt):
-  """ Main transformation method. """
-  all_links = soup.find_all('a')
-
-  # if there are fewer than 16 links on the page
-  # it was likely an error of some kind
-  if len(all_links) <= 16:
-    return []
-    raise ParseError("Not enough links on archive page for {}".format(page_dt))
-
-  metadata = parse_main_and_splash(soup, page_dt)
-
-  # We need to loop through the links and create DrudgeLink objects.
-  processed_links = []
-  for link in all_links:
-
-    drudge_link = process_raw_link(link, metadata, page_dt)
-
-    if drudge_link:
-      processed_links.append(drudge_link)
-
-  return processed_links

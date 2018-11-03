@@ -1,4 +1,5 @@
 import asyncio
+import collections
 import datetime
 import logging
 import multiprocessing
@@ -30,6 +31,8 @@ logger.addHandler(ch)
 class FetchError(Exception):
     pass
 
+DrudgePage = collections.namedtuple("DrudgePage", ['url', 'page_dt'])
+
 class DrudgePage(object):
     """ Represents one an individual snapshot of the Drudge Report """
 
@@ -37,33 +40,35 @@ class DrudgePage(object):
         self.url = url
         self.page_dt = page_dt
 
-    def drudge_page_to_links(self):
-        '''
-        Takes a url to an individual drudge page and transforms it to a list
-        of DrudgeLink namedtuples. In the event of a ParseError, tries to use
-        `html.parser` instead of `lxml`.
-        '''
-        if not hasattr(self, 'html'):
-            raise Exception("Can't process DrudgePage without the html!")
+def drudge_page_to_links(html_str: str, page_dt: datetime.datetime) -> list:
+    '''
+    Takes a url to an individual drudge page and transforms it to a list
+    of DrudgeLink namedtuples. In the event of a ParseError, tries to use
+    `html.parser` instead of `lxml`.
+    '''
+    if not html_str
+	raise Exception("Can't process a drudge page without the html!")
 
-        if not self._page_has_content(self.html):
-            logger.warn("Drudge Page for {} had no content".format(self.page_dt))
-            return []
+    page_is_valid = validate_page_html(html)
+    if not page_is_valid:
+      logger.warn("Drudge Page for {} had no content".format(page_dt)
+      return []
 
-        try:
-            soup = BeautifulSoup(self.html, 'lxml')
-            drudge_links = transform_page_into_drudge_links(soup, self.page_dt)
-            logger.info("Done processing %d links for %s", len(drudge_links), self.page_dt)
-        except ParseError as e:
-            logger.warn("Failed to parse {} using lxml.".format(self.page_dt))
-            drudge_links = []
+    try:
+      soup = BeautifulSoup(html)
+      drudge_links = transform_page_into_drudge_links(soup, page_dt)
+      logger.info("Done processing %d links for %s", len(drudge_links), page_dt)
+    except ParseError as e:
+      logger.warn("Failed to parse {} using lxml.".format(page_dt))
+      drudge_links = []
 
-        return drudge_links
+    return drudge_links
 
     def _page_has_content(self, html):
         """ Returns true if a drudge page has actual content. """
         return b'logo9.gif' in html
 
+DayPageConfig = collections.namedtuple("DayPageConfig", ['dt', 'url'])
 
 class DayPage(object):
     """
@@ -189,28 +194,27 @@ class DayPage(object):
                     tasks.append(task)
             return await asyncio.gather(*tasks)
 
-    def process_day(self, page_limit=None):
-        """
-        Primary public method. Used to fetch one day's worth of links
-        from the drudge archive.
+def get_soup_from_day_page_conf(day_page_conf):
+  """ Fetches HTML for a Day Page """
+  response = requests.get(day_page_conf.url)
+  logger.info("Fetched Day Page for %s", day_page_conf.dt.isoformat())
+  return BeautifulSoup(response.content, 'lxml')
 
-        set page_limit if you only want say the first 10 drudge pages
-        """
-        logger.info("Fetching Day Page for %s, url: %s", self.dt.isoformat(), self.url)
-        links = []
+def process_day_within_loop(day_page: DayPage, loop, page_limit=None):
+  logger.info("Fetching Day Page for %s, url: %s", day_page.dt.isoformat(), day_page.url)
+  links = []
+  try:
 
-        # schedule async fetch tasks
-        try:
-            self.day_page = self._get_day_page()
-            future = asyncio.ensure_future(self._generate_fetch_tasks(page_limit))
-            self._loop.run_until_complete(future)
+    day_page = get_soup_from_day_page_conf(day_page_conf)
+    
+    # generate a Future with fetch tasks and run until they're complete
+    future = asyncio.ensure_future(generate_fetch_tasks(page_limit)
+    loop.run_until_complete(future)
 
-            # Try adding the 
-
-        except ClientError as e:
-            logger.error("Failure on %s, url: %s", self.dt.isoformat(), self.url)
-            raise FetchError
-
+  except ClientError as e:
+      logger.error("Failure on %s, url: %s", self.dt.isoformat(), self.url)
+      raise FetchError
+ 
         # add poison pills so the queue will know when to stop
         if self.has_valid_drudge_page_links:
             for _ in range(PROCESS_COUNT):
