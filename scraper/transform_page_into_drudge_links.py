@@ -4,6 +4,8 @@ import datetime
 from bs4 import BeautifulSoup, Tag
 import urllib.parse
 
+from drudge_data_classes import DrudgeLink
+
 STOP_DOMAINS = [
   'harvest.adgardener.com',
   'a.tribalfusion.com',
@@ -14,14 +16,6 @@ STOP_DOMAINS = [
 LOGO_FILENAME = 'logo9.gif'
 
 NEW_HTML_BEGINS = datetime.datetime(2009, 10, 6, 5, 57, 42)
-
-DrudgeLink = collections.namedtuple("DrudgeLink", [
-    'page_dt',
-    'url',
-    'hed',
-    'is_top',
-    'is_splash'
-])
 
 class ParseError(Exception):
   pass
@@ -136,7 +130,7 @@ def process_raw_link(link, page_main_links, page_dt):
     splash = link == page_main_links['splash']
     top = link in page_main_links['top']
 
-    return DrudgeLink(page_dt, url, link.text, top, splash)
+    return DrudgeLink(url, page_dt, link.text, top, splash)
 
 def parse_main_and_splash(soup, page_dt):
   # we've got different parsing methods for earlier and later iterations
