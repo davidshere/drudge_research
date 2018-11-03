@@ -1,5 +1,4 @@
 import asyncio
-import collections
 import datetime
 import logging
 import multiprocessing
@@ -260,9 +259,14 @@ if __name__ == "__main__":
     x = time.time()
     start = datetime.datetime.now()
     dt = datetime.date.today() - datetime.timedelta(days=30)
-    dt = datetime.datetime(2009, 10, 17)
+    dt = datetime.datetime(2001, 11, 18)
 
-    dp = DayPage(dt)
-    d = dp.process_day()
+    num_links = 0
+    for i in range(10):
+        dp = DayPage(dt + datetime.timedelta(days=i))
+        d = dp.process_day()
+        num_links += len(d)
+
     print("day took", time.time() - x)
+    print(num_links, "links")
     print("processed %d pages" % len(set(a.page_dt for a in d)))

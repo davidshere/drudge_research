@@ -1,4 +1,14 @@
+*.idea
 *.csv
-target/*
+*/target/*
+*/*/target/*
+*/metastore_db/
+*/project/
+*.log
 *.pyc
 *sublime*
+*.vagrant
+*.parquet
+*.swp
+*.swo
+

@@ -88,8 +88,7 @@ object ProcessRawInput {
     // Need to classify link instances as long-term or short-term links
     import processrawinput.LinkMetrics
     val dfWithLinkTypes = LinkMetrics.clusterLinkTypes(dfWithCols)
-    //dfWithCols
-    dfWithLinkTypes.join(dfWithCols, "linkInstanceId")
+    dfWithLinkTypes.join(dfWithCols, "linkId")
 
   }
 
@@ -110,11 +109,9 @@ object ProcessRawInput {
    
     val spark = SparkSession.builder.appName("ProcessRawInput").getOrCreate()
 
-    val df = loadDrudgeLinks("H2Y2010", spark)
-
+    val df = loadDrudgeLinks(s"${args(0)}", spark)
     val transformedDf = transformDataFrame(df)
 
-    transformedDf.show(5)
-
+    transformedDf.write.parquet(s"file:///vagrant/data/processed/${args(0)}.parquet")
   }
 }
