@@ -2,6 +2,7 @@ import collections
 import datetime
 
 from bs4 import BeautifulSoup, Tag
+from bs4.element import ResultSet
 import urllib.parse
 
 from drudge_data_classes import DrudgePageMetadata
@@ -21,27 +22,29 @@ class ParseError(Exception):
   pass
 
 
-def find_splash_with_font_size(soup):
+def find_splash_with_font_size(soup: BeautifulSoup) -> set:
   """ Takes soup and returns the <a> elements representing
       the page splash.
 
-      If no link element is found, returns None
+      If no link element is found, returns an empty set
   """
+  null_set = set()
   font_size_element = soup.find('font', {"size":"+7"})
+  print("font size elem", font_size_element)
   if not font_size_element:
-    return None
+    return null_set
 
   splash_links = font_size_element.find_all('a')
   if splash_links:
     return set(splash_links)
-
+  else:
+    return null_set
   # if the HTML is malformed or the headline isn't a link,
   # this line will return -1
   link = font_size_element.next.find('a')
   if link != -1:
-    print("here!", set([link]))
-  
-    return None 
+    return null_set
+
 
 
 # before mid-2009
@@ -76,10 +79,8 @@ def index_for_splash_element_in_list_of_links(found_splash, links):
   return splash_index
 
 
-def get_early_top(links, found_splash, page_dt):
-  found_splash = found_splash 
+def get_early_top(links: ResultSet, found_splash: set, page_dt: datetime.datetime):
   top_links = set()
-
   try:
     splash_index = index_for_splash_element_in_list_of_links(found_splash, links)
   except ParseError as e:
@@ -91,23 +92,32 @@ def get_early_top(links, found_splash, page_dt):
 
   for link in links[splash_index-1 : 0 : -1]:
     href_netloc = urllib.parse.urlparse(link.get('href')).netloc.lower()
+
+    # empty links
+    if not href_netloc:
+      continue
     if href_netloc in STOP_DOMAINS:
-      return None 
+      return top_links
 
-    if found_splash and link.text and link not in found_splash:
-      top_links.add(link)
-  raise ParseError("get_early_top returned None - it shouldn't do that")
+    if link not in found_splash and link.text:
+        top_links.add(link)
+    
+  raise Exception("wait, I shouldn't be down here")
 
 
-def early_top_splash_finder(soup, page_dt):
-  splash = find_splash_with_font_size(soup)
+def early_top_splash_finder(soup: BeautifulSoup, page_dt: datetime.datetime) -> DrudgePageMetadata:
+  splash_set = find_splash_with_font_size(soup)
+  print("splash set", splash_set)
   links = soup.find_all('a')
-  top = get_early_top(links, splash, page_dt)
-  return DrudgePageMetadata(splash_set=splash, top_set=top)
+  top_set = get_early_top(links, splash_set, page_dt)
+  return DrudgePageMetadata(
+    splash_set=splash_set or None,
+    top_set=top_set or None
+  )
 
 
 # going back to mid-2009
-def recent_top_splash_finder(soup, _):
+def recent_top_splash_finder(soup: BeautifulSoup, _) -> DrudgePageMetadata:
   drudge_top_headlines = soup.find('div', {'id': 'drudgeTopHeadlines'})
 
   if not drudge_top_headlines:
@@ -123,10 +133,12 @@ def recent_top_splash_finder(soup, _):
   return DrudgePageMetadata(splash_set=splash, top_set=top_links)
 
 
-def parse_main_and_splash(soup, page_dt):
+def parse_main_and_splash(soup: BeautifulSoup, page_dt: datetime.datetime) -> DrudgePageMetadata:
+  print(page_dt)
   # we've got different parsing methods for earlier and later iterations
   # of the drudge report
   metadata_parser = recent_top_splash_finder if page_dt >= NEW_HTML_BEGINS else early_top_splash_finder
   metadata = metadata_parser(soup, page_dt)
+  print(metadata)
   return metadata 
 

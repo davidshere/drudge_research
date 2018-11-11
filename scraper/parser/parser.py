@@ -5,7 +5,7 @@ from bs4 import BeautifulSoup, Tag
 import urllib.parse
 
 from drudge_data_classes import DrudgeLink
-import page_metadata
+from parser import page_metadata
 
 STOP_DOMAINS = [
   'harvest.adgardener.com',

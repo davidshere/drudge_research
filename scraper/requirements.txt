@@ -1,7 +1,7 @@
 aiohttp==2.2.5
 async-timeout==1.2.1
 backoff==1.4.3
-beautifulsoup4==4.6.0
+beautifulsoup4==4.6.3
 boto3==1.4.6
 botocore==1.6.1
 bs4==0.0.1
@@ -9,6 +9,7 @@ certifi==2017.7.27.1
 chardet==3.0.4
 dateutils==0.6.6
 docutils==0.14
+html5lib==1.0.1
 idna==2.5
 jmespath==0.9.3
 lxml==4.2.5
@@ -21,4 +22,5 @@ requests==2.18.4
 s3transfer==0.1.10
 six==1.10.0
 urllib3==1.22
+webencodings==0.5.1
 yarl==0.12.0
