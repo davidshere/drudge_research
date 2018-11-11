@@ -30,13 +30,13 @@ def find_splash_with_font_size(soup: BeautifulSoup) -> set:
   """
   null_set = set()
   font_size_element = soup.find('font', {"size":"+7"})
-  print("font size elem", font_size_element)
   if not font_size_element:
     return null_set
 
-  splash_links = font_size_element.find_all('a')
-  if splash_links:
-    return set(splash_links)
+  splash_links_with_text = [link for link in font_size_element.find_all('a') if link.text]
+  print("splash links", splash_links_with_text)
+  if splash_links_with_text:
+    return set(splash_links_with_text)
   else:
     return null_set
   # if the HTML is malformed or the headline isn't a link,
@@ -45,7 +45,13 @@ def find_splash_with_font_size(soup: BeautifulSoup) -> set:
   if link != -1:
     return null_set
 
-
+def find_splash_from_center_tag(soup: BeautifulSoup) -> set:
+  """ 
+  As a backup to find_splash_with_font_size, this method will try to figure
+  out the splash based on the center tags. If we can find a single link in
+  a center tag, we can (maybe) assume it is a splash
+  """
+ 
 
 # before mid-2009
 def is_logo_link(element):
@@ -107,7 +113,6 @@ def get_early_top(links: ResultSet, found_splash: set, page_dt: datetime.datetim
 
 def early_top_splash_finder(soup: BeautifulSoup, page_dt: datetime.datetime) -> DrudgePageMetadata:
   splash_set = find_splash_with_font_size(soup)
-  print("splash set", splash_set)
   links = soup.find_all('a')
   top_set = get_early_top(links, splash_set, page_dt)
   return DrudgePageMetadata(
@@ -116,8 +121,8 @@ def early_top_splash_finder(soup: BeautifulSoup, page_dt: datetime.datetime) -> 
   )
 
 
-# going back to mid-2009
 def recent_top_splash_finder(soup: BeautifulSoup, _) -> DrudgePageMetadata:
+  """ Parses drudge page metadata from earlier iterations with the drudge report """
   drudge_top_headlines = soup.find('div', {'id': 'drudgeTopHeadlines'})
 
   if not drudge_top_headlines:
@@ -130,15 +135,15 @@ def recent_top_splash_finder(soup: BeautifulSoup, _) -> DrudgePageMetadata:
     top_links = set(top_links)
     top_links = top_links.difference(splash)
 
-  return DrudgePageMetadata(splash_set=splash, top_set=top_links)
+  return DrudgePageMetadata(
+    splash_set=splash or None,
+    top_set=top_links or None)
 
 
 def parse_main_and_splash(soup: BeautifulSoup, page_dt: datetime.datetime) -> DrudgePageMetadata:
-  print(page_dt)
   # we've got different parsing methods for earlier and later iterations
   # of the drudge report
   metadata_parser = recent_top_splash_finder if page_dt >= NEW_HTML_BEGINS else early_top_splash_finder
   metadata = metadata_parser(soup, page_dt)
-  print(metadata)
   return metadata 
 

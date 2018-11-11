@@ -14,7 +14,7 @@ EXPECTED_RESULTS = {
  "20011118_235701": DrudgePageMetadata(splash_set=None, top_set=None),
  "20030826_212842": DrudgePageMetadata(splash_set=None, top_set={"Gen. Wesley Clark: 'White House tried to get me knocked off CNN'..."}),
  "20020605_181424": DrudgePageMetadata(splash_set={'ASHCROFT TO REQUIRE SOME VISITORS FINGERPRINTED'}, top_set={'India magazine paints scenario of horror...', 'NUCLEAR RIVALS EXCHANGE INSULTS... ', 'German delay threatens Meteor missile...'}),
- "20070730_190020": DrudgePageMetadata(splash_set={'WHAT WILL IT BE?'}, top_set={'Murdoch rebuffs level of DOW JONES family support...', 'Down to the Wire... '}),
+ "20070730_190020": DrudgePageMetadata(splash_set={'WHAT WILL IT BE?'}, top_set={'Murdoch  rebuffs level of DOW JONES family support...', 'Down to the Wire...'}),
  "20030711_013426": DrudgePageMetadata(splash_set={'CBS: BUSH KNEW IRAQ INFO WAS FALSE'}, top_set=None),
  "20040127_003603": DrudgePageMetadata(splash_set={'New worm spreading rapidly across Internet'}, top_set={'Dow Hits 31-Month High...'}),
  "20040813_202402": DrudgePageMetadata(splash_set={'HELL STORM SLAMS COAST; WINDS TOP 145 MPH'}, top_set=None),
@@ -40,7 +40,7 @@ EXPECTED_RESULTS = {
 }
 
 
-IDS_THAT_SHOULD_RAISE_PARSE_ERRORS = ['20070730_190020']
+IDS_THAT_SHOULD_RAISE_PARSE_ERRORS = []# ['20070730_190020']
 
 def top_splash_to_text(top_and_splash):
   # don't want to test this
@@ -53,7 +53,7 @@ def top_splash_to_text(top_and_splash):
 def load_resource(drudge_page_timestamp):
   with open('test/resources/{}.html'.format(drudge_page_timestamp), 'r') as f:
     html = f.read()
-  return BeautifulSoup(html, 'lxml') 
+  return BeautifulSoup(html, 'html5lib') 
 
 def deserialize_timestamp(drudge_page_timestamp):
   return datetime.datetime.strptime(drudge_page_timestamp, '%Y%m%d_%H%M%S')
@@ -61,7 +61,7 @@ def deserialize_timestamp(drudge_page_timestamp):
 class TopAndSplashTest(unittest.TestCase):
 
   def test_parser(self):
-    self.maxDiff=None
+#    self.maxDiff=None
     for drudge_page_timestamp in EXPECTED_RESULTS.keys():
       # need to simulate the datetimes that we're getting from a DayPage
       soup = load_resource(drudge_page_timestamp)
@@ -72,7 +72,8 @@ class TopAndSplashTest(unittest.TestCase):
           top_splash_to_text(parse_main_and_splash(soup, drudge_page_datetime_obj))
       else:
         top_and_splash = top_splash_to_text(parse_main_and_splash(soup, drudge_page_datetime_obj))
-
+        print("ex", expected_result)
+        print("ts", top_and_splash)
         # don't want to test this
         self.assertEqual(expected_result, top_and_splash)
 
