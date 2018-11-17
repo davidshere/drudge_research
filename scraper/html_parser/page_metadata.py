@@ -34,7 +34,6 @@ def find_splash_with_font_size(soup: BeautifulSoup) -> set:
     return null_set
 
   splash_links_with_text = [link for link in font_size_element.find_all('a') if link.text]
-  print("splash links", splash_links_with_text)
   if splash_links_with_text:
     return set(splash_links_with_text)
   else:
@@ -140,7 +139,7 @@ def recent_top_splash_finder(soup: BeautifulSoup, _) -> DrudgePageMetadata:
     top_set=top_links or None)
 
 
-def parse_main_and_splash(soup: BeautifulSoup, page_dt: datetime.datetime) -> DrudgePageMetadata:
+def get_page_metadata(soup: BeautifulSoup, page_dt: datetime.datetime) -> DrudgePageMetadata:
   # we've got different parsing methods for earlier and later iterations
   # of the drudge report
   metadata_parser = recent_top_splash_finder if page_dt >= NEW_HTML_BEGINS else early_top_splash_finder
