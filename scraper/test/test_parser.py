@@ -18,7 +18,19 @@ def load_text(page_identifier):
 
 
 class ParserTest(unittest.TestCase):
- 
+  @unittest.skip("getting rid of this method hopefully")
+  def tets_is_archive_link(self):
+    top_true = BeautifulSoup('<a href="example.com" target="_top">text</a>', 'html5lib')
+    text9_true = BeautifulSoup('<a href="example.com" class="text9">text</a>', 'html5lib') 
+  
+    top_false = TEST_LINK
+    text9_false = TEST_LINK
+
+    self.assertEqual(parser.is_archive_link(top_true), True)
+    self.assertEqual(parser.is_archive_link(text9_true), True)
+    self.assertEqual(parser.is_archive_link(top_false), False)
+    self.assertEqual(parser.is_archive_link(text9_false), False)
+
   ##
   ## testing process_raw_link
   ## 

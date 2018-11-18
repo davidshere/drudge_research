@@ -22,19 +22,49 @@ HTML_PARSER = 'html5lib'
 # Datetime that drudge switched to a new html structure
 NEW_HTML_BEGINS = datetime.datetime(2009, 10, 6, 5, 57, 42)
 
-def process_raw_link(link: str, metadata: DrudgePageMetadata, page_dt: datetime.datetime) -> DrudgeLink:
+
+def process_link_text(link):
+  text = link.text.strip()
+  text = text.replace('\n', ' ')
+  #if text.endswith('...'):
+  #  text = text[:-3]
+  return text
+
+def process_raw_link(link: Tag, metadata: DrudgePageMetadata, page_dt: datetime.datetime) -> DrudgeLink:
   """ Uses link and page metadata to transform a link into a DrudgeLink """
   url = link.get('href')
-  if url:
+
+  if url and link.text.strip():
     # determine if the link is in the top or the splash. If top or splash are empty
     # then obviously the link is not a member of the empty set
     splash = link.text in metadata.splash_set if metadata.splash_set else False
     top = link.text in metadata.top_set if metadata.top_set else False
 
-    return DrudgeLink(url, page_dt, link.text, top, splash)
+    text = process_link_text(link)
+
+    return DrudgeLink(url, page_dt, text, top, splash)
+
+def remove_dra_tags_from_soup(soup: BeautifulSoup):
+  """ 
+  For each <td> with a class "text9" (indicating the section was added
+  by the archive), mutate the parent soup object to remove the <td>.
+
+  Ditto for tags with the attribute target="_top"
+  """
+  dra_tds = soup.find_all('td', {'class': 'text9'})
+  for td in dra_tds:
+    td.decompose()
+
+  top_targets = soup.find_all(target='_top')
+  for target in top_targets:
+    target.decompose()
+
 
 def soup_into_links_and_metadata(soup: BeautifulSoup, page_dt: datetime.datetime) -> (list, DrudgePageMetadata):
-  
+ 
+  # we want to remove <td> tags with the class "text9"
+  remove_dra_tags_from_soup(soup)
+
   all_links = soup.find_all('a')
 
   # if there are fewer than 16 links on the page
@@ -59,7 +89,6 @@ def html_into_drudge_links(html: str, page_dt: datetime.datetime) -> list:
   processed_links = []
   for link in all_links:
     drudge_link = process_raw_link(link, metadata, page_dt)
-
     if drudge_link:
       processed_links.append(drudge_link)
 

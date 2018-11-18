@@ -95,20 +95,22 @@ def get_early_top(links: ResultSet, found_splash: set, page_dt: datetime.datetim
     else:
       raise
 
+  # go through every link from the one before the splash
+  # to the first, until we hit a stop domain
   for link in links[splash_index-1 : 0 : -1]:
     href_netloc = urllib.parse.urlparse(link.get('href')).netloc.lower()
-
-    # empty links
-    if not href_netloc:
-      continue
+    
+    # there are some links that, if we see them on the way back to the beginning
+    # we know indicate that we're done with actual drudge links and we're onto
+    # ad links or archive links
     if href_netloc in STOP_DOMAINS:
       return top_links
 
-    if link not in found_splash and link.text:
+    # only add links that aren't splashes and that aren't empty/full of weird characters
+    if link not in found_splash and link.text.strip():
         top_links.add(link)
-    
-  raise Exception("wait, I shouldn't be down here")
-
+  
+  return top_links
 
 def early_top_splash_finder(soup: BeautifulSoup, page_dt: datetime.datetime) -> DrudgePageMetadata:
   splash_set = find_splash_with_font_size(soup)

@@ -65,7 +65,6 @@ class TopAndSplashTest(unittest.TestCase):
       
       expected_result = EXPECTED_RESULTS[drudge_page_timestamp]
       top_and_splash = top_splash_to_text(get_page_metadata(soup, drudge_page_datetime_obj))
-      
       self.assertEqual(expected_result, top_and_splash)
 
 
