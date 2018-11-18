@@ -98,41 +98,98 @@ class ScraperRunner:
 import asyncio
 import aiohttp
 
+import multiprocessing
+
 import time
 
-async def worker(name, queue):
+async def worker(name, io_queue, cpu_queue):
   while True:
-    drudge_obj_to_fetch =  await queue.get()
+    drudge_obj_to_fetch =  await io_queue.get()
     async with aiohttp.ClientSession() as session:
       async with session.get(drudge_obj_to_fetch.url) as resp:
+
+        # await the text of the page, attach it to the object we got the
+        # url from, and push it onto the cpu queue
         text = await resp.text()
         drudge_obj_to_fetch.html = text
-    queue.task_done()
+        print("io task!")
+
+    io_queue.task_done()    
+    cpu_queue.put(drudge_obj_to_fetch)
+
 
 async def main():
+  CPU_QUEUE_WORKER_COUNT = multiprocessing.cpu_count()
 
-  DAY_PAGE_FETCH_PRIORITY = 2
-  DRUDGE_PAGE_FETCH_PRIORITY = 1
   day_pages_to_parse = day_pages(start=(datetime.datetime.now() - datetime.timedelta(days=40)).date())
 
   start = time.monotonic()
-  io_queue = asyncio.Queue()
+  io_queue = asyncio.PriorityQueue()
+  cpu_queue = multiprocessing.JoinableQueue()
+  #processed_page_queue = multiprocessing.Queue()
 
+  # prepare the cpu_queue by instantiating workers to process it
+  cpu_consumers = [DrudgePageScrapeHandler(cpu_queue) for _ in range(CPU_QUEUE_WORKER_COUNT)]
+  for consumer in cpu_consumers:
+    consumer.start()
+
+  # add all day pages to the queue
   for day_page in day_pages_to_parse:
-   io_queue.put_nowait(day_page)
+    io_queue.put_nowait(day_page)
 
-  tasks = []
+  # create tasks
+  io_tasks = []
   for i in range(15):
-    task = asyncio.create_task(worker(f'worker-{i}', io_queue))
-    tasks.append(task)
+    task = asyncio.create_task(worker(f'worker-{i}', io_queue, cpu_queue))
+    io_tasks.append(task)
   
+  # block until all web request tasks are complete
   await io_queue.join()
 
-  for task in tasks:
+  # once all web request tasks are complete we can be (hopefully) be confidant
+  # that nothing else will be added to the cpu_queue, so we want to insert
+  # a poison pill to tell the multiprocessing queue that it will be ending soon
+  for _ in cpu_consumers:
+    cpu_queue.put(None)
+  
+  cpu_queue.join()
+
+  for task in io_tasks:
     task.cancel() 
 
-  await asyncio.gather(*tasks, return_exceptions=True)
+  await asyncio.gather(*io_tasks, return_exceptions=True)
   print(time.monotonic() - start)
+
+
+class DrudgePageScrapeHandler(multiprocessing.Process):
+    """
+    This class does one thing - pops a Drudge Page off
+    of a task queue, processes it, and puts the result
+    into a result queue.
+    """
+
+    def __init__(self, task_queue):#, result_queue):
+        multiprocessing.Process.__init__(self)
+        self.task_queue = task_queue
+        #self.result_queue = result_queue
+
+    def run(self):
+        proc_name = self.name
+        while True:
+            page = self.task_queue.get()
+            print("mp_task!", page)
+            
+            if page is None:
+                # Poison pill means shutdown
+                #logger.info('{}: Exiting'.format(proc_name))
+                self.task_queue.task_done()
+                break
+            #links = page.drudge_page_to_links()
+
+            #self.result_queue.put(links)
+            self.task_queue.task_done()
+
+
 
 if __name__ == "__main__":
   asyncio.run(main())
