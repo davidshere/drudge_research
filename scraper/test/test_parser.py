@@ -13,7 +13,7 @@ TEST_LINK = '<a href="http://example.com">{}</a>'.format(TEST_LINK_TEXT)
 TEST_DATETIME = datetime.datetime(1970, 1, 1, 0, 0)
 
 def load_text(page_identifier):
-  with open('resources/{}.html'.format(page_identifier), 'r') as f:
+  with open('test/resources/{}.html'.format(page_identifier), 'r') as f:
     return f.read()
 
 
@@ -46,16 +46,14 @@ class ParserTest(unittest.TestCase):
   ##
   ## testing html_into_drudge_links
   ##
-  def test_html_into_drudge_links_with_lxml(self):
+  def test_html_into_drudge_links(self):
     resource_id = "20060406_000558"
     html = load_text(resource_id)
     links = parser.html_into_drudge_links(html, TEST_DATETIME)
 
-    from resources.expected_drudge_links_20060406_000558 import expected_drudge_links
+    from test.resources.expected_drudge_links_20060406_000558 import expected_drudge_links
     self.assertEqual(links, expected_drudge_links)
 
-  def test_html_into_drudge_links_with_html5lib_backup(self):
-    pass
 
 
 if __name__ == "__main__":

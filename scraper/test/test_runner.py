@@ -1,7 +1,7 @@
 import datetime
 import unittest
 
-from archive_to_s3 import *
+from scraper_runner import *
 from models import DayPage
 
 class ScrapeTests(unittest.TestCase):

@@ -16,6 +16,10 @@ STOP_DOMAINS = [
 
 LOGO_FILENAME = 'logo9.gif'
 
+# for BeautifulSoup
+HTML_PARSER = 'html5lib'
+
+# Datetime that drudge switched to a new html structure
 NEW_HTML_BEGINS = datetime.datetime(2009, 10, 6, 5, 57, 42)
 
 def process_raw_link(link: str, metadata: DrudgePageMetadata, page_dt: datetime.datetime) -> DrudgeLink:
@@ -37,24 +41,19 @@ def soup_into_links_and_metadata(soup: BeautifulSoup, page_dt: datetime.datetime
   # it was likely an error of some kind
   if len(all_links) <= 16:
     return [], DrudgePageMetadata()
-    raise page_metadata.ParseError("Not enough links on archive page for {}".format(page_dt))
 
   metadata = page_metadata.get_page_metadata(soup, page_dt)
   return all_links, metadata
   
 
-def transform_html_with_parser(html: str, parser: str, page_dt: datetime.datetime) -> (list, DrudgePageMetadata):
-  soup = BeautifulSoup(html, parser)
+def transform_html(html: str, page_dt: datetime.datetime) -> (list, DrudgePageMetadata):
+  soup = BeautifulSoup(html, HTML_PARSER)
   return soup_into_links_and_metadata(soup, page_dt)
   
 
 def html_into_drudge_links(html: str, page_dt: datetime.datetime) -> list:
   """ Main transformation method. """
-  try:
-    all_links, metadata = transform_html_with_parser(html, "lxml", page_dt) 
-  except page_metadata.ParseError as pe:
-    # try to parse again with a different parser, as a backup
-    all_links, metadata = transform_html_with_parser(soup, "html5lib", page_dt)
+  all_links, metadata = transform_html_with_parser(html, HTML_PARSER, page_dt) 
 
   # We need to loop through the links and create DrudgeLink objects.
   processed_links = []

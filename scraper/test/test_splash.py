@@ -3,7 +3,7 @@ import unittest
 
 from bs4 import BeautifulSoup, Tag
 
-from html_parser.page_metadata import parse_main_and_splash, ParseError
+from html_parser.page_metadata import get_page_metadata, ParseError
 from drudge_data_classes import DrudgePageMetadata
 
 EARLY_DT = datetime.datetime(2001, 11, 19, 0, 0)
@@ -40,8 +40,6 @@ EXPECTED_RESULTS = {
 }
 
 
-IDS_THAT_SHOULD_RAISE_PARSE_ERRORS = []# ['20070730_190020']
-
 def top_splash_to_text(top_and_splash):
   # don't want to test this
   if top_and_splash.splash_set:
@@ -53,7 +51,7 @@ def top_splash_to_text(top_and_splash):
 def load_resource(drudge_page_timestamp):
   with open('test/resources/{}.html'.format(drudge_page_timestamp), 'r') as f:
     html = f.read()
-  return BeautifulSoup(html, 'html5lib') 
+  return BeautifulSoup(html, 'html5lib')
 
 def deserialize_timestamp(drudge_page_timestamp):
   return datetime.datetime.strptime(drudge_page_timestamp, '%Y%m%d_%H%M%S')
@@ -61,21 +59,14 @@ def deserialize_timestamp(drudge_page_timestamp):
 class TopAndSplashTest(unittest.TestCase):
 
   def test_parser(self):
-#    self.maxDiff=None
     for drudge_page_timestamp in EXPECTED_RESULTS.keys():
-      # need to simulate the datetimes that we're getting from a DayPage
       soup = load_resource(drudge_page_timestamp)
       drudge_page_datetime_obj = deserialize_timestamp(drudge_page_timestamp)
+      
       expected_result = EXPECTED_RESULTS[drudge_page_timestamp]
-      if drudge_page_timestamp in IDS_THAT_SHOULD_RAISE_PARSE_ERRORS:
-        with self.assertRaises(ParseError):
-          top_splash_to_text(parse_main_and_splash(soup, drudge_page_datetime_obj))
-      else:
-        top_and_splash = top_splash_to_text(parse_main_and_splash(soup, drudge_page_datetime_obj))
-        print("ex", expected_result)
-        print("ts", top_and_splash)
-        # don't want to test this
-        self.assertEqual(expected_result, top_and_splash)
+      top_and_splash = top_splash_to_text(get_page_metadata(soup, drudge_page_datetime_obj))
+      
+      self.assertEqual(expected_result, top_and_splash)
 
 
 if __name__ == "__main__":

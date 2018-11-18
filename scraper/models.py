@@ -10,7 +10,7 @@ from bs4 import BeautifulSoup
 import requests
 import backoff
 
-from transform_page_into_drudge_links import transform_page_into_drudge_links, ParseError
+from html_parser.page_metadata import ParseError, get_page_metadata
 
 DAY_PAGE_FMT_URL = "http://www.drudgereportarchives.com/data/%s/%02d/%02d/index.htm?s=flag"
 MIN_START_DATE = datetime.date(2001, 11, 18)
@@ -46,12 +46,12 @@ def drudge_page_to_links(html_str: str, page_dt: datetime.datetime) -> list:
     of DrudgeLink namedtuples. In the event of a ParseError, tries to use
     `html.parser` instead of `lxml`.
     '''
-    if not html_str
-	raise Exception("Can't process a drudge page without the html!")
+    if not html_str:
+        raise Exception("Can't process a drudge page without the html!")
 
     page_is_valid = validate_page_html(html)
     if not page_is_valid:
-      logger.warn("Drudge Page for {} had no content".format(page_dt)
+      logger.warn("Drudge Page for {} had no content".format(page_dt))
       return []
 
     try:
@@ -208,28 +208,26 @@ def process_day_within_loop(day_page: DayPage, loop, page_limit=None):
     day_page = get_soup_from_day_page_conf(day_page_conf)
     
     # generate a Future with fetch tasks and run until they're complete
-    future = asyncio.ensure_future(generate_fetch_tasks(page_limit)
+    future = asyncio.ensure_future(generate_fetch_tasks(page_limit))
     loop.run_until_complete(future)
 
   except ClientError as e:
       logger.error("Failure on %s, url: %s", self.dt.isoformat(), self.url)
       raise FetchError
  
-        # add poison pills so the queue will know when to stop
-        if self.has_valid_drudge_page_links:
-            for _ in range(PROCESS_COUNT):
-                self._task_queue.put(None)
+  # add poison pills so the queue will know when to stop
+  if self.has_valid_drudge_page_links:
+      for _ in range(PROCESS_COUNT):
+          self._task_queue.put(None)
+      # block execution until the queues are empty
+      self._task_queue.join()
 
-            # block execution until the queues are empty
-            self._task_queue.join()
+      links = self._processed_page_queue_to_links()
 
-            links = self._processed_page_queue_to_links()
-
-            # turn off processes
-            for proc in self._consumers:
-                proc.terminate()
-
-        return links
+      # turn off processes
+      for proc in self._consumers:
+          proc.terminate()
+  return links
 
 class DrudgePageScrapeHandler(multiprocessing.Process):
     """
