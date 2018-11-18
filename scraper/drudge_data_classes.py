@@ -1,6 +1,8 @@
 import dataclasses
 import datetime
 
+import utils
+
 @dataclasses.dataclass
 class DrudgePageMetadata:
   """ Should populated by page_metadata.py """
@@ -17,8 +19,9 @@ class DrudgeBase:
 @dataclasses.dataclass
 class DayPage(DrudgeBase):
   """ Represents a page on the archive capturing a day's worth of DrudgePages """
-  dt: datetime.date
-
+  def __init__(self, dt: datetime.date):
+    super().__init__(url=utils.day_page_url_from_dt(dt))
+    self.dt = dt
 
 @dataclasses.dataclass
 class DrudgePage(DrudgeBase):

@@ -53,7 +53,7 @@ def transform_html(html: str, page_dt: datetime.datetime) -> (list, DrudgePageMe
 
 def html_into_drudge_links(html: str, page_dt: datetime.datetime) -> list:
   """ Main transformation method. """
-  all_links, metadata = transform_html_with_parser(html, HTML_PARSER, page_dt) 
+  all_links, metadata = transform_html(html, page_dt) 
 
   # We need to loop through the links and create DrudgeLink objects.
   processed_links = []
