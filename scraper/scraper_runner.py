@@ -2,12 +2,16 @@ import datetime
 import io
 import multiprocessing as mp
 
+import asyncio
+import aiohttp
+
 import boto3
 import pandas as pd
 import pyarrow as pa
 import pyarrow.parquet as pq
 
-from models import DayPage, logger
+#from models import DayPage, logger
+from drudge_data_classes import DayPage
 
 BUCKET_NAME = 'drudge-archive'
 S3_LOCATION_FMT = 'data/{yearhalf}.parquet'
@@ -90,8 +94,54 @@ class ScraperRunner:
                 current_links = []
                 self.current_file = self._increment_file(page)
 
+#### New stuff
+import asyncio
+import aiohttp
+
+import time
+
+async def worker(name, queue):
+  while True:
+    drudge_obj_to_fetch =  await queue.get()
+    async with aiohttp.ClientSession() as session:
+      async with session.get(drudge_obj_to_fetch.url) as resp:
+        text = await resp.text()
+        drudge_obj_to_fetch.html = text
+    queue.task_done()
+
+async def main():
+
+  DAY_PAGE_FETCH_PRIORITY = 2
+  DRUDGE_PAGE_FETCH_PRIORITY = 1
+  day_pages_to_parse = day_pages(start=(datetime.datetime.now() - datetime.timedelta(days=40)).date())
+
+  start = time.monotonic()
+  io_queue = asyncio.Queue()
+
+  for day_page in day_pages_to_parse:
+   io_queue.put_nowait(day_page)
+
+  tasks = []
+  for i in range(15):
+    task = asyncio.create_task(worker(f'worker-{i}', io_queue))
+    tasks.append(task)
+  
+  await io_queue.join()
+
+  for task in tasks:
+    task.cancel() 
+
+  await asyncio.gather(*tasks, return_exceptions=True)
+  print(time.monotonic() - start)
 
 if __name__ == "__main__":
+  asyncio.run(main())
 
-    runner = ScraperRunner()
-    runner.run()
+
+
+
+
+
+
+
+
