@@ -23,6 +23,8 @@ def transform_day_page(page: DayPage) -> list:
   
   for link in all_links:
     href = link.get("href").lower()
+    if href.startswith('//'):
+      href = 'http:' + href
     
     # make sure there is an href and the right kind of archive link, and
     # yield a drudge page

@@ -126,6 +126,7 @@ async def main():
 
   start = time.monotonic()
   io_queue = asyncio.PriorityQueue()
+  # TODO: Switch to using aioprocessing for thread-safe multiprocessing
   cpu_queue = multiprocessing.JoinableQueue()
   #processed_page_queue = multiprocessing.Queue()
 
@@ -152,9 +153,9 @@ async def main():
   # a poison pill to tell the multiprocessing queue that it will be ending soon
   for _ in cpu_consumers:
     cpu_queue.put(None)
-  
+  print('down here!') 
   cpu_queue.join()
-
+  print('even further!')
   for task in io_tasks:
     task.cancel() 
 
@@ -179,10 +180,9 @@ class DrudgePageScrapeHandler(multiprocessing.Process):
 
       if isinstance(page, DayPage):
         drudge_links = transform_day_page.transform_day_page(page)
-        print(len(list(drudge_links)))
         for link in drudge_links:
-          io_queue.put_nowait(link)
-          print(io_queue.qsize())
+          self.io_queue.put_nowait(link)
+        print('q', self.io_queue.qsize())
  
       if page is None:
         self.task_queue.task_done()
