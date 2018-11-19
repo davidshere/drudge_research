@@ -17,6 +17,8 @@ class TestTransformDayPage(unittest.TestCase):
     day_page.html = html
 
     links = list(transform_day_page.transform_day_page(day_page))
+    for link in links:
+      print(link)
     
     from test.resources.expected_drudge_pages import expected_drudge_pages
     self.assertEqual(links, expected_drudge_pages)

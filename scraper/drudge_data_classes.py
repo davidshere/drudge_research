@@ -33,9 +33,12 @@ class DayPage(DrudgeBase):
 class DrudgePage(DrudgeBase):
   """ Represents an individual iteration of the drudge report """
   def __init__(self, url: str, page_dt: datetime.datetime):
-    super().__init__(url)
+    super().__init__(url=url)
     self.page_dt = page_dt
     self.priority = 1
+
+  def __repr__(self):
+    return f"  DrudgePage(url={self.url.__repr__()}, page_dt={self.page_dt.__repr__()}),"
 
 
 @dataclasses.dataclass

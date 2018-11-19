@@ -256,7 +256,7 @@ class DrudgePageScrapeHandler(multiprocessing.Process):
             self.task_queue.task_done()
 
 
-
+"""
 if __name__ == "__main__":
     x = time.time()
     start = datetime.datetime.now()
@@ -272,3 +272,5 @@ if __name__ == "__main__":
     print("day took", time.time() - x)
     print(num_links, "links")
     print("processed %d pages" % len(set(a.page_dt for a in d)))
+"""
+
