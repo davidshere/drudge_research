@@ -3,7 +3,7 @@ import datetime
 from drudge_data_classes import DrudgePage
 
 expected_drudge_pages = [
-  DrudgePage(url='http://www.drudgereportarchives.com/data/2017/08/12/20170812_000005.htm', page_dt=datetime.datetime(2017, 8, 12, 0, 0, 5)),
+  DrudgePage(url='//www.drudgereportarchives.com/data/2017/08/12/20170812_000005.htm', page_dt=datetime.datetime(2017, 8, 12, 0, 0, 5)),
   DrudgePage(url='http://www.drudgereportarchives.com/data/2017/08/12/20170812_000203.htm', page_dt=datetime.datetime(2017, 8, 12, 0, 2, 3)),
   DrudgePage(url='http://www.drudgereportarchives.com/data/2017/08/12/20170812_000604.htm', page_dt=datetime.datetime(2017, 8, 12, 0, 6, 4)),
   DrudgePage(url='http://www.drudgereportarchives.com/data/2017/08/12/20170812_000803.htm', page_dt=datetime.datetime(2017, 8, 12, 0, 8, 3)),
