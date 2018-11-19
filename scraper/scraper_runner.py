@@ -129,7 +129,7 @@ async def main():
   #processed_page_queue = multiprocessing.Queue()
 
   # prepare the cpu_queue by instantiating workers to process it
-  cpu_consumers = [DrudgePageScrapeHandler(cpu_queue) for _ in range(CPU_QUEUE_WORKER_COUNT)]
+  cpu_consumers = [DrudgePageScrapeHandler(cpu_queue, io_queue) for _ in range(CPU_QUEUE_WORKER_COUNT)]
   for consumer in cpu_consumers:
     consumer.start()
 
@@ -161,33 +161,31 @@ async def main():
   print(time.monotonic() - start)
 
 
+
 class DrudgePageScrapeHandler(multiprocessing.Process):
-    """
-    This class does one thing - pops a Drudge Page off
-    of a task queue, processes it, and puts the result
-    into a result queue.
-    """
+  """ Handles parsing drudge objects into links """
 
-    def __init__(self, task_queue):#, result_queue):
-        multiprocessing.Process.__init__(self)
-        self.task_queue = task_queue
-        #self.result_queue = result_queue
+  def __init__(self, task_queue, io_queue):#, result_queue):
+    multiprocessing.Process.__init__(self)
+    self.task_queue = task_queue
+    self.io_queue = io_queue
+    #self.result_queue = result_queue
 
-    def run(self):
-        proc_name = self.name
-        while True:
-            page = self.task_queue.get()
-            print("mp_task!", page)
-            
-            if page is None:
-                # Poison pill means shutdown
-                #logger.info('{}: Exiting'.format(proc_name))
-                self.task_queue.task_done()
-                break
-            #links = page.drudge_page_to_links()
+  def run(self):
+    proc_name = self.name
+    while True:
+      page = self.task_queue.get()
 
-            #self.result_queue.put(links)
-            self.task_queue.task_done()
+      if isinstance(page, DayPage):
+        drudge_links = transform_day_page.transform_day_page(page)
+        for link in drudge_links:
+          io_queue.put_nowait(link)
+ 
+      if page is None:
+        self.task_queue.task_done()
+        break
+      
+      self.task_queue.task_done()
 
 
 

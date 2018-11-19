@@ -6,6 +6,7 @@ import urllib.parse
 
 from drudge_data_classes import DrudgeLink, DrudgePageMetadata
 from html_parser import page_metadata
+import utils
 
 STOP_DOMAINS = [
   'harvest.adgardener.com',
@@ -44,26 +45,10 @@ def process_raw_link(link: Tag, metadata: DrudgePageMetadata, page_dt: datetime.
 
     return DrudgeLink(url, page_dt, text, top, splash)
 
-def remove_dra_tags_from_soup(soup: BeautifulSoup):
-  """ 
-  For each <td> with a class "text9" (indicating the section was added
-  by the archive), mutate the parent soup object to remove the <td>.
-
-  Ditto for tags with the attribute target="_top"
-  """
-  dra_tds = soup.find_all('td', {'class': 'text9'})
-  for td in dra_tds:
-    td.decompose()
-
-  top_targets = soup.find_all(target='_top')
-  for target in top_targets:
-    target.decompose()
-
-
 def soup_into_links_and_metadata(soup: BeautifulSoup, page_dt: datetime.datetime) -> (list, DrudgePageMetadata):
  
   # we want to remove <td> tags with the class "text9"
-  remove_dra_tags_from_soup(soup)
+  utils.remove_dra_tags_from_soup(soup)
 
   all_links = soup.find_all('a')
 
