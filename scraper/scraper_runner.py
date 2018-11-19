@@ -10,8 +10,9 @@ import pandas as pd
 import pyarrow as pa
 import pyarrow.parquet as pq
 
-#from models import DayPage, logger
 from drudge_data_classes import DayPage
+from html_parser import transform_day_page
+
 
 BUCKET_NAME = 'drudge-archive'
 S3_LOCATION_FMT = 'data/{yearhalf}.parquet'
@@ -112,7 +113,7 @@ async def worker(name, io_queue, cpu_queue):
         # url from, and push it onto the cpu queue
         text = await resp.text()
         drudge_obj_to_fetch.html = text
-        print("io task!")
+        print("io task!", drudge_obj_to_fetch)
 
     io_queue.task_done()    
     cpu_queue.put(drudge_obj_to_fetch)
@@ -178,8 +179,10 @@ class DrudgePageScrapeHandler(multiprocessing.Process):
 
       if isinstance(page, DayPage):
         drudge_links = transform_day_page.transform_day_page(page)
+        print(len(list(drudge_links)))
         for link in drudge_links:
           io_queue.put_nowait(link)
+          print(io_queue.qsize())
  
       if page is None:
         self.task_queue.task_done()
