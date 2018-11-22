@@ -1,6 +1,8 @@
 import dataclasses
 import datetime
 
+import requests
+
 import utils
 
 @dataclasses.dataclass
@@ -15,10 +17,6 @@ class DrudgeBase:
   """ A base class for various resources that refer to a particular internet page """
   url: str
 
-  def __lt__(self, other):
-    """ Define this property so we can use these in a priority queue """
-    return self.priority < other.priority
-
 
 @dataclasses.dataclass
 class DayPage(DrudgeBase):
@@ -26,7 +24,6 @@ class DayPage(DrudgeBase):
   def __init__(self, dt: datetime.date):
     super().__init__(url=utils.day_page_url_from_dt(dt))
     self.dt = dt
-    self.priority = 2
 
 
 @dataclasses.dataclass
@@ -35,11 +32,12 @@ class DrudgePage(DrudgeBase):
   def __init__(self, url: str, page_dt: datetime.datetime):
     super().__init__(url=url)
     self.page_dt = page_dt
-    self.priority = 1
+
 
   def __repr__(self):
     return f"  DrudgePage(url={self.url.__repr__()}, page_dt={self.page_dt.__repr__()}),"
 
+  
 
 @dataclasses.dataclass
 class DrudgeLink(DrudgeBase):
@@ -48,3 +46,7 @@ class DrudgeLink(DrudgeBase):
   hed: str
   is_top: bool = False
   is_splash: bool = False
+
+  def to_csv(self):
+    attrs = self.__dict__
+    return ','.join([str(attrs[attr]) for attr in attrs])
