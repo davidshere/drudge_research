@@ -3,7 +3,7 @@ This module contains a function `handler` that is the main
 entry point for an AWS Lambda function. This function will
 take a list of DayPages or DrudgePages, serialized into JSON,
 it will asynchronously fetch the html, and will post the result
-to an output sink - SQS or Kinesis, it's unclear which
+to an SQS queue
 """
 import asyncio
 import time
@@ -13,15 +13,17 @@ import boto3
 
 import sqs_utils
 
-test_event = [{
-  "url": "http://www.drudgereportarchives.com/data/2018/11/25/index.htm?s=flag",
-  "dt": "2018-11-25 11:35:42.732506",
-  "cls": "day_page"
-}, {
-  "url": "http://www.drudgereportarchives.com/data/2018/11/24/index.htm?s=flag",
-  "dt": "2018-11-24",
-  "cls": "day_page"
-}]
+test_event = {
+  'Records': [{
+    'body':[{
+      "url": "http://www.drudgereportarchives.com/data/2018/11/25/index.htm?s=flag",
+      "dt": "2018-11-25 11:35:42.732506",
+      "cls": "day_page"
+    }, {
+      "url": "http://www.drudgereportarchives.com/data/2018/11/24/index.htm?s=flag",
+      "dt": "2018-11-24",
+      "cls": "day_page"
+}]}]}
 
 
 async def worker(name, fetch_queue, result_queue):
@@ -74,7 +76,8 @@ async def main(pages):
   
 
 def handler(event, context):
-  asyncio.run(main(event))
+  pages = event['Records'][0]['body']
+  asyncio.run(main(pages))
 
 
 if __name__ == "__main__":
