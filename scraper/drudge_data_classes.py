@@ -26,13 +26,25 @@ class DrudgeBase:
 @dataclasses.dataclass
 class DayPage(DrudgeBase):
   """ Represents a page on the archive capturing a day's worth of DrudgePages """
-  def __init__(self, dt: datetime.date):
+  def __init__(self, dt: datetime.date, html=None, cls='day_page'):
     super().__init__(url=utils.day_page_url_from_dt(dt))
     self.dt = dt
+    self.html = html
+    self.cls = cls
 
   def to_json(self):
-    return self._to_json_with_identifier('day_page')
+    return self._to_json_with_identifier(self.cls)
 
+  @staticmethod
+  def from_json(params):
+    if isinstance(params, str):
+      params = json.loads(params)
+
+    if params.get('url'):
+      del(params['url'])
+
+    return DayPage(**params)
+    
 
 @dataclasses.dataclass
 class DrudgePage(DrudgeBase):
@@ -45,7 +57,7 @@ class DrudgePage(DrudgeBase):
     return self._to_json_with_identifier('drudge_page')
 
   def __repr__(self):
-    return f"  DrudgePage(url={self.url.__repr__()}, page_dt={self.page_dt.__repr__()}),"
+    return f"DrudgePage(url={self.url.__repr__()}, page_dt={self.page_dt.__repr__()})"
 
   
 

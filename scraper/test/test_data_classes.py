@@ -1,6 +1,9 @@
 import datetime
 import unittest
 
+import sys
+sys.path.append("..")
+
 from drudge_data_classes import DayPage
 
 class TestDataClasses(unittest.TestCase):
@@ -10,3 +13,6 @@ class TestDataClasses(unittest.TestCase):
 
     self.assertEqual(day_page.dt, test_date)
     self.assertEqual(day_page.url, "http://www.drudgereportarchives.com/data/1970/01/01/index.htm?s=flag")
+
+if __name__ == "__main__":
+  unittest.main()

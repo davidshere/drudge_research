@@ -77,7 +77,8 @@ async def main(pages):
 
 def handler(event, context):
   pages = event['Records'][0]['body']
-  asyncio.run(main(pages))
+  x = asyncio.run(main(pages))
+  print(x) 
 
 
 if __name__ == "__main__":
